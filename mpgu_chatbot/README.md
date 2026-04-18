@@ -3,7 +3,7 @@
 A bilingual (English + Russian) university support chatbot built for interview demos and rapid MVP showcasing.
 
 This version is designed to be **reliable in live interviews**:
-- Works with **Hugging Face API** when token is available.
+- Works with **Gemini API**, **OpenAI API**, or **Hugging Face API** when token is available.
 - Gracefully falls back to a **knowledge-base intent engine** when API is missing/fails.
 - Exposes conversation metadata (`source`, `intent`, `confidence`, `language`) to demonstrate engineering depth.
 
@@ -34,6 +34,8 @@ This version is designed to be **reliable in live interviews**:
 - HTML + CSS + Vanilla JavaScript
 
 ### AI Layer
+- Gemini API (`gemini-2.5-flash` by default)
+- OpenAI Responses API (`gpt-5.2` by default)
 - Hugging Face Inference API (`google/flan-t5-base`)
 - Local knowledge base (`backend/data/knowledge_base.json`)
 
@@ -69,10 +71,10 @@ mpgu_chatbot/
 ## 🧠 Response Pipeline
 
 1. User sends message from frontend.
-2. Backend tries Hugging Face inference (if token configured).
+2. Backend tries Gemini first (default in `auto` mode), then OpenAI, then Hugging Face.
 3. If unavailable/low reliability, backend answers from intent knowledge base.
 4. Backend returns response + metadata:
-   - `source`: `hugging_face` or `knowledge_base` / `knowledge_fallback`
+   - `source`: `gemini`, `openai`, `hugging_face`, `knowledge_base`, or `knowledge_fallback`
    - `intent`
    - `confidence`
    - `language`
@@ -137,7 +139,12 @@ pip install -r requirements.txt
 Create `backend/.env`:
 
 ```env
-HUGGING_FACE_TOKEN=your_token_here
+AI_PROVIDER=auto
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-5.2
+HUGGING_FACE_TOKEN=your_huggingface_token
 SECRET_KEY=change-me
 REQUEST_TIMEOUT_SECONDS=15
 ```
@@ -158,6 +165,127 @@ python -m http.server 3000
 ```
 
 Open `http://localhost:3000`
+
+---
+
+## 🏆 Which API is best for placements?
+
+For your interview demo, use this order:
+
+1. **Gemini (`gemini-2.5-flash`)** for speed + quality balance in demos.
+2. **OpenAI (`gpt-5.2`)** as strong secondary option.
+3. **Hugging Face** as additional backup.
+4. **Knowledge fallback** for guaranteed offline reliability.
+
+In this project, set:
+
+```env
+AI_PROVIDER=auto
+```
+
+`auto` tries Gemini first, then OpenAI, then Hugging Face, then fallback.
+
+If you want forced mode:
+
+```env
+AI_PROVIDER=gemini
+# or
+AI_PROVIDER=openai
+# or
+AI_PROVIDER=huggingface
+# or
+AI_PROVIDER=knowledge
+```
+
+---
+
+## 🔐 How to get Gemini API key (detailed)
+
+1. Open Google AI Studio: https://aistudio.google.com/  
+2. Create an API key for Gemini and copy it.  
+3. Never paste key in frontend/client files. Keep it in backend `.env` only.  
+4. Ensure your Google Cloud/project billing/quota is configured for your usage.  
+5. Add key in `backend/.env`:
+
+```env
+GEMINI_API_KEY=AIza...
+GEMINI_MODEL=gemini-2.5-flash
+AI_PROVIDER=gemini
+```
+
+6. Restart backend and verify:
+   - `GET /health` should show provider mode.
+   - Responses will show `source: gemini` when Gemini is used.
+
+---
+
+## ☁️ Run when project is only on GitHub (no local files)
+
+### Option A (Recommended): GitHub Codespaces
+
+1. Open your GitHub repository page.
+2. Click **Code → Codespaces → Create codespace on branch**.
+3. In terminal:
+   ```bash
+   cd mpgu_chatbot/backend
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+4. Create `backend/.env` with your API keys.
+5. Start backend:
+   ```bash
+   python run.py
+   ```
+6. In second terminal:
+   ```bash
+   cd mpgu_chatbot/frontend
+   python -m http.server 3000
+   ```
+7. Use forwarded ports in Codespaces (3000 and 5000) and open the UI.
+
+### Option B: Local clone from GitHub
+
+```bash
+git clone <your-github-repo-url>
+cd <repo>/mpgu_chatbot
+```
+
+Then run the same backend/frontend steps from this README.
+
+---
+
+## 🧩 If GitHub says “This branch has conflicts that must be resolved”
+
+This usually happens when the base branch changed after your branch was created (both branches edited the same lines in the same files).
+
+For your listed conflict files, run this from the repository root:
+
+```bash
+git checkout <your-branch>
+git merge <base-branch>
+bash mpgu_chatbot/resolve_branch_conflicts.sh
+git commit -m "Resolve merge conflicts"
+git push
+```
+
+If you want to resolve manually, open each conflicted file and remove markers:
+
+- `<<<<<<< HEAD`
+- `=======`
+- `>>>>>>> branch-name`
+
+then:
+
+```bash
+git add mpgu_chatbot/README.md \
+        mpgu_chatbot/backend/app/config.py \
+        mpgu_chatbot/backend/app/main.py \
+        mpgu_chatbot/backend/app/services/chat_engine.py \
+        mpgu_chatbot/backend/run.py
+git commit -m "Resolve merge conflicts manually"
+git push
+```
 
 ---
 

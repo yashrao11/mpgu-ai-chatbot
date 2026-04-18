@@ -1,6 +1,5 @@
 import json
 import logging
-import random
 import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -128,15 +127,156 @@ class ChatEngine:
             logger.exception("Hugging Face response parse failed")
             return None
 
+    def _openai_response(self, message: str, context: list[dict[str, str]]) -> str | None:
+        if not Config.OPENAI_API_KEY:
+            return None
+
+        context_window = context[-6:]
+        input_messages: list[dict[str, str]] = [
+            {
+                "role": "system",
+                "content": (
+                    "You are MPGU Smart Assistant. Be concise, practical, and answer in the same language "
+                    "as the user. Prefer step-by-step instructions for academic workflows."
+                ),
+            }
+        ]
+        for turn in context_window:
+            role = "assistant" if turn["role"] == "assistant" else "user"
+            input_messages.append({"role": role, "content": turn["text"]})
+        input_messages.append({"role": "user", "content": message})
+
+        headers = {
+            "Authorization": f"Bearer {Config.OPENAI_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": Config.OPENAI_MODEL,
+            "input": input_messages,
+            "max_output_tokens": 260,
+        }
+
+        try:
+            response = requests.post(
+                Config.OPENAI_API_URL,
+                headers=headers,
+                json=payload,
+                timeout=Config.REQUEST_TIMEOUT_SECONDS,
+            )
+            if response.status_code != 200:
+                logger.warning("OpenAI API returned %s", response.status_code)
+                return None
+
+            body = response.json()
+            if isinstance(body, dict):
+                if body.get("output_text"):
+                    return str(body["output_text"]).strip() or None
+
+                output_items = body.get("output", [])
+                for item in output_items:
+                    if item.get("type") == "message":
+                        for part in item.get("content", []):
+                            if part.get("type") in {"output_text", "text"} and part.get("text"):
+                                return str(part["text"]).strip() or None
+            return None
+        except requests.RequestException:
+            logger.exception("OpenAI request failed")
+            return None
+        except (ValueError, KeyError, TypeError):
+            logger.exception("OpenAI response parse failed")
+            return None
+
+    def _gemini_response(self, message: str, context: list[dict[str, str]]) -> str | None:
+        if not Config.GEMINI_API_KEY:
+            return None
+
+        recent_turns = context[-6:]
+        conversation_lines = []
+        for turn in recent_turns:
+            prefix = "Assistant" if turn["role"] == "assistant" else "User"
+            conversation_lines.append(f"{prefix}: {turn['text']}")
+        conversation_lines.append(f"User: {message}")
+
+        prompt = (
+            "You are MPGU Smart Assistant. Keep answers clear, concise, and practical. "
+            "Respond in the same language as the user's last question.\n\n"
+            "Conversation:\n"
+            + "\n".join(conversation_lines)
+        )
+
+        url = Config.GEMINI_API_URL_TEMPLATE.format(
+            model=Config.GEMINI_MODEL,
+            api_key=Config.GEMINI_API_KEY,
+        )
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "text": prompt
+                        }
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.4,
+                "maxOutputTokens": 260
+            }
+        }
+
+        try:
+            response = requests.post(
+                url,
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=Config.REQUEST_TIMEOUT_SECONDS,
+            )
+            if response.status_code != 200:
+                logger.warning("Gemini API returned %s", response.status_code)
+                return None
+
+            body = response.json()
+            candidates = body.get("candidates", [])
+            if not candidates:
+                return None
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if not parts:
+                return None
+            text = parts[0].get("text", "")
+            return str(text).strip() or None
+        except requests.RequestException:
+            logger.exception("Gemini request failed")
+            return None
+        except (ValueError, KeyError, TypeError):
+            logger.exception("Gemini response parse failed")
+            return None
+
     def process(self, message: str, user_id: str) -> ChatResult:
         language = self.detect_language(message)
         session = self.sessions.setdefault(user_id, [])
 
-        ai_reply = self._hugging_face_response(message, language, session)
+        ai_reply = None
+        source = ""
+
+        if Config.AI_PROVIDER in {"auto", "gemini"}:
+            ai_reply = self._gemini_response(message, session)
+            if ai_reply:
+                source = "gemini"
+
+        if not ai_reply and Config.AI_PROVIDER in {"auto", "openai"}:
+            ai_reply = self._openai_response(message, session)
+            if ai_reply:
+                source = "openai"
+
+        if not ai_reply and Config.AI_PROVIDER in {"auto", "huggingface"}:
+            ai_reply = self._hugging_face_response(message, language, session)
+            if ai_reply:
+                source = "hugging_face"
+
         if ai_reply:
             result = ChatResult(
                 reply=ai_reply,
-                source="hugging_face",
+                source=source,
                 intent="ai_generated",
                 confidence=0.9,
                 language=language,
