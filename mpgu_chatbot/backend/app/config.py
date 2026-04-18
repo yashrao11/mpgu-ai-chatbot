@@ -23,6 +23,7 @@ class Config:
     # Hugging Face API Configuration
     HUGGING_FACE_TOKEN = os.getenv("HUGGING_FACE_TOKEN")
     
+    # Use a more reliable model
     # Use a production-grade instruction model
     HUGGING_FACE_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
     REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "15"))
@@ -40,6 +41,7 @@ class Config:
     ]
 
 def validate_config():
+    print("✅ MPGU Chatbot configuration validated successfully!")
     hf_model = Config.HUGGING_FACE_API_URL.rsplit("/", maxsplit=1)[-1]
     hf_token_status = "set" if Config.HUGGING_FACE_TOKEN else "not set"
     gemini_key_status = "set" if Config.GEMINI_API_KEY else "not set"
@@ -51,3 +53,4 @@ def validate_config():
         f"openai_model={Config.OPENAI_MODEL} | openai_key={openai_token_status} | "
         f"hf_model={hf_model} | hf_token={hf_token_status}"
     )
+mpgu_chatbot/backend/app/main.py

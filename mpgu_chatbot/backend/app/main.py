@@ -7,6 +7,8 @@ from app.schemas import HealthResponse
 # Create FastAPI app
 app = FastAPI(
     title="MPGU AI Chatbot API",
+    description="AI Assistant for Moscow Pedagogical State University - Powered by Hugging Face",
+    version="4.0.0"
     description="Hybrid AI assistant API for university support (MPGU) with resilient fallback responses",
     version="5.0.0"
 )
@@ -24,8 +26,15 @@ app.add_middleware(
 app.include_router(chat_router, prefix="/api/v1")
 
 # Health check endpoint
+@app.get("/")
 @app.get("/", response_model=HealthResponse)
 async def root():
+    return {
+        "status": "running",
+        "service": "MPGU AI Chatbot",
+        "version": "4.0.0",
+        "ai_provider": "Hugging Face"
+    }
     return HealthResponse(
         status="running",
         service="MPGU AI Chatbot",
@@ -33,8 +42,14 @@ async def root():
         ai_provider=f"{Config.AI_PROVIDER} (gemini/openai/huggingface/knowledge supported)",
     )
 
+@app.get("/health")
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
+    return {
+        "status": "healthy", 
+        "service": "MPGU Chatbot API",
+        "ai_provider": "Hugging Face"
+    }
     return HealthResponse(
         status="healthy",
         service="MPGU Chatbot API",
@@ -51,4 +66,5 @@ if __name__ == "__main__":
         port=5000,
         reload=True,
         log_level="info"
+    )
     )
