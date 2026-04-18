@@ -255,6 +255,40 @@ Then run the same backend/frontend steps from this README.
 
 ---
 
+## 🧩 If GitHub says “This branch has conflicts that must be resolved”
+
+This usually happens when the base branch changed after your branch was created (both branches edited the same lines in the same files).
+
+For your listed conflict files, run this from the repository root:
+
+```bash
+git checkout <your-branch>
+git merge <base-branch>
+bash mpgu_chatbot/resolve_branch_conflicts.sh
+git commit -m "Resolve merge conflicts"
+git push
+```
+
+If you want to resolve manually, open each conflicted file and remove markers:
+
+- `<<<<<<< HEAD`
+- `=======`
+- `>>>>>>> branch-name`
+
+then:
+
+```bash
+git add mpgu_chatbot/README.md \
+        mpgu_chatbot/backend/app/config.py \
+        mpgu_chatbot/backend/app/main.py \
+        mpgu_chatbot/backend/app/services/chat_engine.py \
+        mpgu_chatbot/backend/run.py
+git commit -m "Resolve merge conflicts manually"
+git push
+```
+
+---
+
 ## ✅ Demo Script (for Interview)
 
 1. Ask: “How can I apply for admission?”
