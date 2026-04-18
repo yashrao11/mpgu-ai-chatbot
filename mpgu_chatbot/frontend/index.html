@@ -3,57 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MPGU Smart Assistant - Hugging Face AI</title>
+    <title>MPGU Smart Assistant • Placement Edition</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="chat-container">
-        <div class="chat-header">
+        <header class="chat-header">
             <div class="header-content">
                 <div class="logo">🎓</div>
                 <div class="header-text">
                     <h1>MPGU Smart Assistant</h1>
-                    <p>Powered by Hugging Face AI • Московский педагогический государственный университет</p>
+                    <p>Placement Edition • Hybrid AI + Knowledge Fallback</p>
                 </div>
-                <div class="status-indicator" id="statusIndicator"></div>
+                <div class="status-wrap">
+                    <span class="status-label" id="statusLabel">Checking...</span>
+                    <span class="status-indicator" id="statusIndicator"></span>
+                </div>
             </div>
-        </div>
+        </header>
 
-        <div class="chat-messages" id="chatMessages">
-            <div class="message bot-message">
+        <section class="quick-actions" id="quickActions">
+            <button class="chip" data-msg="How can I apply for admission?">Admissions</button>
+            <button class="chip" data-msg="How do I register for courses?">Course Registration</button>
+            <button class="chip" data-msg="Show me schedule guidance">Schedule</button>
+            <button class="chip" data-msg="How to find tutors?">Tutors</button>
+            <button class="chip" data-msg="Контакты МПГУ">Контакты</button>
+        </section>
+
+        <main class="chat-messages" id="chatMessages">
+            <article class="message bot-message">
                 <div class="message-content">
-                    <strong>MPGU Assistant:</strong> Hello! I'm your MPGU Smart Assistant powered by Hugging Face AI. I can help you with:
-                    <ul>
-                        <li>University information and schedules (MPGU)</li>
-                        <li>Course registration and enrollment</li>
-                        <li>Study materials and academic support</li>
-                        <li>Tutor recommendations</li>
-                        <li>Platform navigation (Enlight Russia)</li>
-                        <li>Educational content recommendations</li>
-                    </ul>
-                    I support both English and Russian. How can I assist you today?
+                    <strong>MPGU Assistant:</strong> Welcome! Ask me about admissions, courses, schedules, tutors, exams, or contacts.
+                    <br><br>
+                    You can ask in English or Russian. I will answer step-by-step.
                 </div>
-                <div class="message-time" id="welcomeTime"></div>
-            </div>
-        </div>
+                <div class="message-meta">
+                    <span class="badge">source: system</span>
+                </div>
+            </article>
+        </main>
 
-        <div class="chat-input-container">
+        <footer class="chat-input-container">
             <div class="input-wrapper">
-                <input 
-                    type="text" 
-                    id="messageInput" 
-                    placeholder="Ask about MPGU, courses, tutors, schedules, or study help..."
-                    maxlength="500"
+                <input
+                    type="text"
+                    id="messageInput"
+                    placeholder="Ask your question..."
+                    maxlength="800"
                 >
-                <button id="sendButton" class="send-button">
-                    <span class="button-text">Send</span>
-                    <span class="button-icon">↑</span>
-                </button>
+                <button id="sendButton" class="send-button" disabled>Send</button>
+                <button id="clearButton" class="secondary-button">Clear</button>
             </div>
-            <div class="input-hints">
-                <span class="hint">Try: "How to register for courses?" or "Контакты МПГУ" or "Расписание занятий"</span>
-            </div>
-        </div>
+            <p class="hint">Tip: Ask specific questions to get better answers.</p>
+        </footer>
     </div>
 
     <script src="script.js"></script>

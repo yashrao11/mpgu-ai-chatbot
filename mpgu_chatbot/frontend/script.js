@@ -1,231 +1,246 @@
 class MPGUChatbot {
     constructor() {
-        this.backendUrl = 'http://localhost:5000/api/v1/chat';
+        this.backendBase = 'http://localhost:5000';
+        this.chatEndpoint = `${this.backendBase}/api/v1/chat`;
         this.messagesContainer = document.getElementById('chatMessages');
         this.messageInput = document.getElementById('messageInput');
         this.sendButton = document.getElementById('sendButton');
+        this.clearButton = document.getElementById('clearButton');
         this.statusIndicator = document.getElementById('statusIndicator');
-        
-        this.userId = this.generateUserId();
+        this.statusLabel = document.getElementById('statusLabel');
+        this.quickActions = document.getElementById('quickActions');
+
+        this.userId = this.getOrCreateUserId();
         this.isConnected = false;
-        
+
         this.init();
     }
-    
+
     init() {
         this.setupEventListeners();
-        this.setWelcomeTime();
         this.testConnection();
     }
-    
-    generateUserId() {
-        return 'user_' + Math.random().toString(36).substr(2, 9);
+
+    getOrCreateUserId() {
+        const existing = localStorage.getItem('mpgu_user_id');
+        if (existing) {
+            return existing;
+        }
+        const created = `user_${Math.random().toString(36).slice(2, 10)}`;
+        localStorage.setItem('mpgu_user_id', created);
+        return created;
     }
-    
+
     setupEventListeners() {
         this.sendButton.addEventListener('click', () => this.sendMessage());
-        this.messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
+        this.clearButton.addEventListener('click', () => this.clearHistory());
+
+        this.messageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
                 this.sendMessage();
             }
         });
-        
+
         this.messageInput.addEventListener('input', () => {
             this.sendButton.disabled = !this.messageInput.value.trim();
         });
+
+        this.quickActions.addEventListener('click', (event) => {
+            if (event.target.classList.contains('chip')) {
+                this.messageInput.value = event.target.dataset.msg || '';
+                this.sendButton.disabled = !this.messageInput.value.trim();
+                this.messageInput.focus();
+            }
+        });
     }
-    
-    setWelcomeTime() {
-        const timeElement = document.getElementById('welcomeTime');
-        if (timeElement) {
-            timeElement.textContent = this.getCurrentTime();
-        }
-    }
-    
+
     async testConnection() {
+        this.setStatus('connecting');
         try {
-            console.log('🔍 Testing connection to MPGU Chatbot backend...');
-            const response = await fetch('http://localhost:5000/health', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                console.log('✅ Backend health check:', data);
-                this.setStatus('connected');
-                this.isConnected = true;
-                this.addSystemMessage('✅ Connected to MPGU Assistant (Hugging Face + smart fallback)');
-            } else {
+            const response = await fetch(`${this.backendBase}/health`);
+            if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
+
+            const body = await response.json();
+            this.isConnected = true;
+            this.setStatus('connected', body.ai_provider || 'Connected');
+            this.addSystemMessage('✅ Connected. Ready for interview demo mode.');
         } catch (error) {
-            console.error('❌ Connection test failed:', error);
-            this.setStatus('error');
-            this.addSystemMessage('❌ Cannot connect to backend. Please make sure the server is running on port 5000.');
+            this.isConnected = false;
+            this.setStatus('error', 'Backend offline');
+            this.addSystemMessage('❌ Backend not reachable at http://localhost:5000');
         }
     }
-    
-    setStatus(status) {
-        const statusMap = {
-            connected: { color: '#22c55e', tooltip: 'Connected to MPGU Assistant' },
-            error: { color: '#ef4444', tooltip: 'Connection error - check backend server' },
-            connecting: { color: '#eab308', tooltip: 'Connecting...' }
+
+    setStatus(status, label = '') {
+        const map = {
+            connected: { color: '#16a34a', text: 'Connected' },
+            connecting: { color: '#f59e0b', text: 'Connecting' },
+            error: { color: '#dc2626', text: 'Disconnected' }
         };
-        
-        const statusInfo = statusMap[status] || statusMap.error;
-        this.statusIndicator.style.background = statusInfo.color;
-        this.statusIndicator.title = statusInfo.tooltip;
+
+        const state = map[status] || map.error;
+        this.statusIndicator.style.background = state.color;
+        this.statusLabel.textContent = label || state.text;
     }
-    
+
     async sendMessage() {
-        const message = this.messageInput.value.trim();
-        if (!message) return;
-        
-        // Add user message to chat
-        this.addMessage(message, 'user');
-        this.messageInput.value = '';
-        this.sendButton.disabled = true;
-        
-        // If backend is not connected, show error
-        if (!this.isConnected) {
-            this.addMessage("Backend server is not running. Please start the server with 'python run.py' in the backend directory.", 'bot', true);
-            this.sendButton.disabled = false;
+        const text = this.messageInput.value.trim();
+        if (!text) {
             return;
         }
-        
-        // Show typing indicator
+
+        this.addMessage(text, 'user');
+        this.messageInput.value = '';
+        this.sendButton.disabled = true;
+
+        if (!this.isConnected) {
+            this.addMessage('Backend server is not connected. Start backend with: python run.py', 'bot', {
+                source: 'client',
+                isError: true
+            });
+            return;
+        }
+
         this.showTypingIndicator();
-        
+
         try {
-            console.log('🚀 Sending message to backend:', message);
-            
-            const response = await fetch(this.backendUrl, {
+            const response = await fetch(this.chatEndpoint, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: message,
+                    message: text,
                     user_id: this.userId
                 })
             });
-            
-            console.log('📊 Response status:', response.status);
-            
+
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(`HTTP ${response.status}: ${errorText}`);
             }
-            
+
             const data = await response.json();
-            console.log('✅ Response data:', data);
-            
-            this.hideTypingIndicator();
-            this.addMessage(data.reply, 'bot');
-            
+            this.addMessage(data.reply, 'bot', {
+                source: data.source,
+                language: data.language,
+                intent: data.intent,
+                confidence: data.confidence
+            });
         } catch (error) {
-            this.hideTypingIndicator();
-            console.error('❌ Chat error:', error);
-            
-            this.addMessage(
-                `Sorry, I encountered an error: ${error.message}. Please check the console for details.`, 
-                'bot', 
-                true
-            );
+            this.addMessage(`Error: ${error.message}`, 'bot', {
+                source: 'client',
+                isError: true
+            });
         } finally {
+            this.hideTypingIndicator();
             this.sendButton.disabled = false;
             this.messageInput.focus();
         }
     }
-    
-    addMessage(content, sender, isError = false) {
-        const messageElement = document.createElement('div');
-        messageElement.className = `message ${sender}-message ${isError ? 'error-message' : ''}`;
-        
-        const messageContent = document.createElement('div');
-        messageContent.className = 'message-content';
-        messageContent.innerHTML = this.formatMessage(content);
-        
-        const messageTime = document.createElement('div');
-        messageTime.className = 'message-time';
-        messageTime.textContent = this.getCurrentTime();
-        
-        messageElement.appendChild(messageContent);
-        messageElement.appendChild(messageTime);
-        
-        this.messagesContainer.appendChild(messageElement);
+
+    async clearHistory() {
+        try {
+            await fetch(`${this.backendBase}/api/v1/chat/history/${this.userId}`, {
+                method: 'DELETE'
+            });
+        } catch {
+            // Ignore network errors when clearing history
+        }
+
+        this.messagesContainer.innerHTML = '';
+        this.addSystemMessage('🧹 Chat history cleared for this user session.');
+    }
+
+    addMessage(content, sender, options = {}) {
+        const { source = '', language = '', intent = '', confidence = null, isError = false } = options;
+
+        const message = document.createElement('article');
+        message.className = `message ${sender}-message ${isError ? 'error-message' : ''}`;
+
+        const contentEl = document.createElement('div');
+        contentEl.className = 'message-content';
+        contentEl.innerHTML = this.formatMessage(content);
+
+        const metaEl = document.createElement('div');
+        metaEl.className = 'message-meta';
+
+        const badges = [];
+        if (source) badges.push(`source: ${source}`);
+        if (language) badges.push(`lang: ${language}`);
+        if (intent) badges.push(`intent: ${intent}`);
+        if (confidence !== null && confidence !== undefined) badges.push(`confidence: ${confidence}`);
+
+        badges.forEach((text) => {
+            const badge = document.createElement('span');
+            badge.className = 'badge';
+            badge.textContent = text;
+            metaEl.appendChild(badge);
+        });
+
+        const timeEl = document.createElement('div');
+        timeEl.className = 'message-time';
+        timeEl.textContent = this.getCurrentTime();
+
+        message.appendChild(contentEl);
+        if (badges.length) {
+            message.appendChild(metaEl);
+        }
+        message.appendChild(timeEl);
+
+        this.messagesContainer.appendChild(message);
         this.scrollToBottom();
     }
-    
-    addSystemMessage(content) {
-        const systemElement = document.createElement('div');
-        systemElement.className = 'message bot-message';
-        systemElement.style.backgroundColor = '#f1f5f9';
-        systemElement.style.color = '#475569';
-        systemElement.style.fontSize = '12px';
-        systemElement.style.fontStyle = 'italic';
-        
-        const messageContent = document.createElement('div');
-        messageContent.className = 'message-content';
-        messageContent.textContent = content;
-        
-        systemElement.appendChild(messageContent);
-        this.messagesContainer.appendChild(systemElement);
-        this.scrollToBottom();
+
+    addSystemMessage(text) {
+        this.addMessage(text, 'bot', { source: 'system' });
     }
-    
+
     formatMessage(content) {
-        // Simple formatting for URLs and basic markdown
         return content
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color: #3b82f6; text-decoration: underline;">$1</a>')
+            .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
             .replace(/\n/g, '<br>');
     }
-    
+
     showTypingIndicator() {
-        const typingElement = document.createElement('div');
-        typingElement.className = 'typing-indicator';
-        typingElement.id = 'typingIndicator';
-        
-        typingElement.innerHTML = `
-            <div>MPGU Assistant is thinking</div>
+        const typingEl = document.createElement('article');
+        typingEl.className = 'typing-indicator';
+        typingEl.id = 'typingIndicator';
+        typingEl.innerHTML = `
+            <span>Assistant is thinking</span>
             <div class="typing-dots">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
             </div>
         `;
-        
-        this.messagesContainer.appendChild(typingElement);
+        this.messagesContainer.appendChild(typingEl);
         this.scrollToBottom();
     }
-    
+
     hideTypingIndicator() {
-        const typingElement = document.getElementById('typingIndicator');
-        if (typingElement) {
-            typingElement.remove();
+        const node = document.getElementById('typingIndicator');
+        if (node) {
+            node.remove();
         }
     }
-    
+
     scrollToBottom() {
         this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
     }
-    
+
     getCurrentTime() {
-        return new Date().toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
+        return new Date().toLocaleTimeString('en-US', {
+            hour: '2-digit',
             minute: '2-digit',
-            hour12: false 
+            hour12: false
         });
     }
 }
 
-// Initialize chatbot when page loads
 document.addEventListener('DOMContentLoaded', () => {
     new MPGUChatbot();
 });

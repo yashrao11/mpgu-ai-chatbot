@@ -7,8 +7,9 @@ class Config:
     # Hugging Face API Configuration
     HUGGING_FACE_TOKEN = os.getenv("HUGGING_FACE_TOKEN")
     
-    # Use a more reliable model
+    # Use a production-grade instruction model
     HUGGING_FACE_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
+    REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "15"))
     
     # Security
     SECRET_KEY = os.getenv("SECRET_KEY", "mpgu-chatbot-working-2024")
@@ -23,4 +24,6 @@ class Config:
     ]
 
 def validate_config():
-    print("✅ MPGU Chatbot configuration validated successfully!")
+    model = Config.HUGGING_FACE_API_URL.rsplit("/", maxsplit=1)[-1]
+    token_status = "set" if Config.HUGGING_FACE_TOKEN else "not set (fallback mode)"
+    print(f"✅ MPGU Chatbot configuration validated | model={model} | token={token_status}")

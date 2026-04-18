@@ -1,67 +1,29 @@
-# MPGU Smart Assistant (AI Chatbot)
+# MPGU Smart Assistant — Placement Edition
 
-A bilingual (English + Russian) chatbot prototype for Moscow Pedagogical State University (MPGU) student support workflows.
+A bilingual (English + Russian) university support chatbot built for interview demos and rapid MVP showcasing.
 
-It is designed as a **hybrid assistant**:
-- Uses Hugging Face Inference API when available.
-- Falls back to deterministic domain responses for reliability.
-
----
-
-## Table of Contents
-- [Overview](#overview)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Architecture](#architecture)
-- [How Response Generation Works](#how-response-generation-works)
-- [API Documentation](#api-documentation)
-- [Setup Guide (Local)](#setup-guide-local)
-- [Run Frontend and Backend Together](#run-frontend-and-backend-together)
-- [Configuration](#configuration)
-- [Testing and Validation](#testing-and-validation)
-- [Known Limitations](#known-limitations)
-- [Production Hardening Roadmap](#production-hardening-roadmap)
-- [Interview/Portfolio Positioning](#interviewportfolio-positioning)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
+This version is designed to be **reliable in live interviews**:
+- Works with **Hugging Face API** when token is available.
+- Gracefully falls back to a **knowledge-base intent engine** when API is missing/fails.
+- Exposes conversation metadata (`source`, `intent`, `confidence`, `language`) to demonstrate engineering depth.
 
 ---
 
-## Overview
+## ✨ Highlights
 
-This project is an MVP chatbot for university-related support queries such as:
-- course registration
-- schedules
-- tutor/teacher discovery
-- university contact/help information
-- basic platform navigation guidance
-
-The assistant supports both English and Russian input and includes resilience mechanisms to avoid complete failure if external AI is unavailable.
+- Hybrid response pipeline (AI + deterministic fallback)
+- Bilingual support (English/Russian)
+- FastAPI backend with typed schemas
+- Session-based chat history endpoints
+- Frontend with quick prompts and metadata badges
+- Clear health and diagnostics endpoints
 
 ---
 
-## Features
-
-- ✅ Bilingual interaction (English/Russian)
-- ✅ FastAPI backend with clean REST endpoint
-- ✅ Frontend chat UI with:
-  - connection status indicator
-  - typing indicator
-  - user/bot message history in session
-- ✅ Hybrid response generation:
-  - Hugging Face model inference
-  - smart-response fallback from curated domain intents
-- ✅ Health endpoints for backend availability checks
-- ✅ CORS-enabled for local frontend/backend development
-
----
-
-## Tech Stack
+## 🧱 Tech Stack
 
 ### Backend
-- Python
+- Python 3.10+
 - FastAPI
 - Uvicorn
 - Pydantic
@@ -69,291 +31,187 @@ The assistant supports both English and Russian input and includes resilience me
 - python-dotenv
 
 ### Frontend
-- HTML5
-- CSS3
-- Vanilla JavaScript
+- HTML + CSS + Vanilla JavaScript
 
-### AI
-- Hugging Face Inference API (`google/flan-t5-base` configured)
-- Rule-based fallback intent map and response templates
+### AI Layer
+- Hugging Face Inference API (`google/flan-t5-base`)
+- Local knowledge base (`backend/data/knowledge_base.json`)
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```text
 mpgu_chatbot/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              # FastAPI app entrypoint
-│   │   ├── config.py            # Env + model + CORS config
-│   │   └── routes/
-│   │       └── chat.py          # Chat endpoint + response engine
+│   │   ├── main.py                  # FastAPI app + middleware + health
+│   │   ├── config.py                # Env config
+│   │   ├── schemas.py               # Pydantic request/response models
+│   │   ├── routes/
+│   │   │   └── chat.py              # Chat + history routes
+│   │   └── services/
+│   │       └── chat_engine.py       # Hybrid response engine
+│   ├── data/
+│   │   └── knowledge_base.json      # Intent keywords and bilingual replies
 │   ├── requirements.txt
-│   └── run.py                   # Convenience server runner
+│   └── run.py                       # Local runner
 ├── frontend/
-│   ├── index.html               # Chat UI structure
-│   ├── styles.css               # UI styling
-│   └── script.js                # Client logic + API calls
-└── PROJECT_POSITIONING_GUIDE.md # Interview positioning notes
+│   ├── index.html
+│   ├── script.js
+│   └── styles.css
+├── README.md
+└── PROJECT_POSITIONING_GUIDE.md
 ```
 
 ---
 
-## Architecture
+## 🧠 Response Pipeline
 
-```mermaid
-flowchart LR
-    U[User] --> F[Frontend Chat UI\nHTML/CSS/JS]
-    F -->|POST /api/v1/chat| B[FastAPI Backend]
-    B -->|try external inference| HF[Hugging Face API]
-    HF -->|response or failure| B
-    B -->|fallback if needed| SR[Smart Response Engine\n(intent + templates)]
-    B --> F
-    F --> U
-```
+1. User sends message from frontend.
+2. Backend tries Hugging Face inference (if token configured).
+3. If unavailable/low reliability, backend answers from intent knowledge base.
+4. Backend returns response + metadata:
+   - `source`: `hugging_face` or `knowledge_base` / `knowledge_fallback`
+   - `intent`
+   - `confidence`
+   - `language`
 
-### Service boundaries
-- Frontend communicates with backend via REST.
-- Backend manages language detection, intent mapping, external AI call, fallback strategy.
-- External dependency is optional at runtime due to fallback architecture.
+This gives you strong talking points for reliability and fallback design in interviews.
 
 ---
 
-## How Response Generation Works
+## 🔌 API Endpoints
 
-1. User sends message to backend (`POST /api/v1/chat`).
-2. Backend sanitizes and validates input.
-3. For non-trivial messages, backend attempts Hugging Face API.
-4. If model result is unavailable/weak/error, backend falls back to curated smart responses.
-5. Response payload includes reply + metadata (`message_id`, `user_id`, `api_used`).
-
-This approach balances quality and reliability during prototype phase.
-
----
-
-## API Documentation
-
-### Base URL (local)
-`http://localhost:5000`
+Base URL: `http://localhost:5000`
 
 ### `GET /`
-Service root and metadata.
-
-**Example response:**
-```json
-{
-  "status": "running",
-  "service": "MPGU AI Chatbot",
-  "version": "4.0.0",
-  "ai_provider": "Hugging Face"
-}
-```
+Service info.
 
 ### `GET /health`
-Health check endpoint.
-
-**Example response:**
-```json
-{
-  "status": "healthy",
-  "service": "MPGU Chatbot API",
-  "ai_provider": "Hugging Face"
-}
-```
+Health endpoint with version/provider mode.
 
 ### `POST /api/v1/chat`
-Main chat endpoint.
+Chat endpoint.
 
-**Request body:**
+**Request**
 ```json
 {
   "message": "How do I register for courses?",
-  "user_id": "user_123"
+  "user_id": "user_abc123"
 }
 ```
 
-**Successful response:**
+**Response**
 ```json
 {
-  "reply": "Course registration is done through ...",
-  "message_id": 4721,
-  "user_id": "user_123",
-  "api_used": "Hugging Face AI"
+  "reply": "Course registration flow: ...",
+  "message_id": 3241,
+  "user_id": "user_abc123",
+  "source": "knowledge_base",
+  "intent": "course_registration",
+  "confidence": 0.73,
+  "language": "en"
 }
 ```
 
-**Validation error example:**
-- If message is empty/whitespace, backend returns status code `400` with appropriate detail.
+### `GET /api/v1/chat/history/{user_id}`
+Returns in-memory conversation history for a user.
+
+### `DELETE /api/v1/chat/history/{user_id}`
+Clears a user chat session.
 
 ---
 
-## Setup Guide (Local)
+## 🚀 Quick Start (Local)
 
-## Prerequisites
-- Python 3.10+
-- pip
-- (Optional) Hugging Face API token
+## 1) Backend
 
-## 1) Clone and enter project
 ```bash
-git clone <your-repo-url>
-cd <your-repo-root>/mpgu_chatbot
-```
-
-## 2) Backend setup
-```bash
-cd backend
+cd mpgu_chatbot/backend
 python -m venv .venv
-source .venv/bin/activate   # Linux/macOS
-# .venv\Scripts\activate    # Windows PowerShell
-
+source .venv/bin/activate         # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## 3) Environment variables
-Create `.env` inside `backend/`:
+Create `backend/.env`:
 
 ```env
 HUGGING_FACE_TOKEN=your_token_here
-SECRET_KEY=change-this-in-real-deployments
+SECRET_KEY=change-me
+REQUEST_TIMEOUT_SECONDS=15
 ```
 
-> If `HUGGING_FACE_TOKEN` is missing, the app still works using fallback responses.
+Run backend:
 
-## 4) Run backend
 ```bash
 python run.py
 ```
-Backend starts at: `http://localhost:5000`
 
-## 5) Run frontend
-In a second terminal:
-```bash
-cd <your-repo-root>/mpgu_chatbot/frontend
-python -m http.server 3000
-```
-Open: `http://localhost:3000`
+## 2) Frontend
 
----
+Open second terminal:
 
-## Run Frontend and Backend Together
-
-### Terminal A
-```bash
-cd mpgu_chatbot/backend
-source .venv/bin/activate
-python run.py
-```
-
-### Terminal B
 ```bash
 cd mpgu_chatbot/frontend
 python -m http.server 3000
 ```
 
-### Verify
-- Backend health: `http://localhost:5000/health`
-- Frontend: `http://localhost:3000`
+Open `http://localhost:3000`
 
 ---
 
-## Configuration
+## ✅ Demo Script (for Interview)
 
-Defined in `backend/app/config.py`:
-- `HUGGING_FACE_TOKEN`
-- `HUGGING_FACE_API_URL`
-- `SECRET_KEY`
-- `ALLOWED_ORIGINS`
-
-Adjust `ALLOWED_ORIGINS` if you host frontend/backend on different domains in future.
+1. Ask: “How can I apply for admission?”
+2. Ask: “Контакты МПГУ”
+3. Show metadata badges (`source/intent/language/confidence`).
+4. Disable/remove token and demonstrate graceful fallback still works.
+5. Clear chat history with `Clear` button and show fresh session.
 
 ---
 
-## Testing and Validation
-
-Current lightweight checks:
+## 🧪 Validation Commands
 
 ```bash
-# Compile backend modules
-python -m compileall app
+# from repo root
+python -m compileall mpgu_chatbot/backend/app
 
-# Optional quick import smoke test
+# optional smoke run (from backend dir)
 PYTHONPATH=. python - <<'PY'
-from app.routes.chat import get_smart_response
-print(get_smart_response('hello'))
+from app.services.chat_engine import chat_engine
+print(chat_engine.process('How to register for courses?', 'demo_user'))
 PY
 ```
 
-Recommended next step: add `pytest` with
-- endpoint test (`/api/v1/chat`)
-- fallback behavior test
-- language detection test
+---
+
+## ⚠️ Current Constraints
+
+- History is in-memory (resets on restart)
+- No auth/roles yet
+- No database or dashboard analytics yet
+- Knowledge base is static JSON (not RAG/vector search yet)
 
 ---
 
-## Known Limitations
+## 📌 Production Upgrade Path
 
-- Prototype status: not production deployed.
-- Intent mapping is rule-based and finite.
-- No authentication/authorization.
-- No persistent database for chat history/analytics.
-- Limited observability (no structured logs/metrics dashboards).
-
----
-
-## Production Hardening Roadmap
-
-- Add automated tests (`pytest`, CI)
-- Add persistent storage (SQLite/PostgreSQL)
-- Add auth (JWT/OAuth)
-- Add logging + monitoring (request IDs, latency, fallback rate)
-- Add containerization (Docker)
-- Add retrieval-based answer grounding from curated knowledge docs
+- Add persistent DB (PostgreSQL)
+- Add JWT auth + role-based access
+- Add request logging + metrics
+- Add Redis session/rate limiting
+- Add RAG over official university docs
+- Dockerize + deploy to cloud
 
 ---
 
-## Interview/Portfolio Positioning
+## 🪪 Portfolio Positioning Line
 
-You can describe this as:
-
-> “A bilingual international university-support chatbot MVP using FastAPI + JavaScript, designed with a resilient hybrid response strategy (external LLM + deterministic fallback) for uptime and cost control in early-stage deployment.”
-
-Suggested talking points:
-- Reliability tradeoffs in AI products
-- Error handling and graceful degradation
-- API contract design and frontend integration
-- Roadmap from MVP to production
-
----
-
-## Troubleshooting
-
-### Frontend shows “Cannot connect to backend”
-- Ensure backend is running on port `5000`.
-- Verify `http://localhost:5000/health` in browser.
-- Check CORS origins in `config.py`.
-
-### AI replies always from fallback
-- Confirm `HUGGING_FACE_TOKEN` is set in `backend/.env`.
-- Check outbound network/API quota.
-- Inspect backend console for request errors/timeouts.
-
-### Import issues (`No module named app`)
-- Run backend commands from `mpgu_chatbot/backend` directory.
-- Or set `PYTHONPATH` accordingly.
-
----
-
-## Contributing
-
-Contributions are welcome. A good first PR:
-1. Add tests for `/api/v1/chat`.
-2. Add `.env.example` and onboarding notes.
-3. Improve intent mapping and response quality.
+> “Built a bilingual hybrid AI assistant with deterministic fallback and metadata-rich responses for reliable university support workflows in interview/demo conditions.”
 
 ---
 
 ## License
 
-No license file is currently included in this repository. Add a `LICENSE` (e.g., MIT) before public distribution.
+No license file is currently included. Add one (MIT/Apache-2.0) before public distribution.
