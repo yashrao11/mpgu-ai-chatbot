@@ -58,7 +58,7 @@ class MPGUChatbot {
                 console.log('✅ Backend health check:', data);
                 this.setStatus('connected');
                 this.isConnected = true;
-                this.addSystemMessage('✅ Connected to MPGU Assistant (DeepSeek AI)');
+                this.addSystemMessage('✅ Connected to MPGU Assistant (Hugging Face + smart fallback)');
             } else {
                 throw new Error(`HTTP ${response.status}`);
             }

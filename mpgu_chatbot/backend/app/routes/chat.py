@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import requests
-import json
 import random
 import re
+from app.config import Config
 
 router = APIRouter()
 
@@ -220,7 +220,9 @@ Answer:"""
                     return generated_text.split("Answer:")[-1].strip()
                 return generated_text
         return None
-    except:
+    except requests.RequestException:
+        return None
+    except (ValueError, KeyError, TypeError):
         return None
 
 @router.post("/chat")
