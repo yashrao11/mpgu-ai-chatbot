@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<<<<<<< ours
+    <title>MPGU Smart Assistant • Placement Edition</title>
+=======
+    <title>MPGU Smart Assistant • Gemini Demo</title>
+>>>>>>> theirs
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="chat-container">
+        <header class="chat-header">
+            <div class="header-content">
+                <div class="logo">🎓</div>
+                <div class="header-text">
+                    <h1>MPGU Smart Assistant</h1>
+<<<<<<< ours
+                    <p>Placement Edition • Hybrid AI + Knowledge Fallback</p>
+=======
+                    <p>Gemini-first • Knowledge fallback for reliability</p>
+>>>>>>> theirs
+                </div>
+                <div class="status-wrap">
+                    <span class="status-label" id="statusLabel">Checking...</span>
+                    <span class="status-indicator" id="statusIndicator"></span>
+                </div>
+            </div>
+        </header>
+
+        <section class="quick-actions" id="quickActions">
+            <button class="chip" data-msg="How can I apply for admission?">Admissions</button>
+            <button class="chip" data-msg="How do I register for courses?">Course Registration</button>
+            <button class="chip" data-msg="Show me schedule guidance">Schedule</button>
+            <button class="chip" data-msg="How to find tutors?">Tutors</button>
+            <button class="chip" data-msg="Контакты МПГУ">Контакты</button>
+        </section>
+
+        <main class="chat-messages" id="chatMessages">
+            <article class="message bot-message">
+                <div class="message-content">
+                    <strong>MPGU Assistant:</strong> Welcome! Ask me about admissions, courses, schedules, tutors, exams, or contacts.
+                    <br><br>
+                    You can ask in English or Russian. I will answer step-by-step.
+                </div>
+                <div class="message-meta">
+                    <span class="badge">source: system</span>
+                </div>
+            </article>
+        </main>
+
+        <footer class="chat-input-container">
+            <div class="input-wrapper">
+                <input
+                    type="text"
+                    id="messageInput"
+                    placeholder="Ask your question..."
+                    maxlength="800"
+                >
+                <button id="sendButton" class="send-button" disabled>Send</button>
+                <button id="clearButton" class="secondary-button">Clear</button>
+            </div>
+            <p class="hint">Tip: Ask specific questions to get better answers.</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
