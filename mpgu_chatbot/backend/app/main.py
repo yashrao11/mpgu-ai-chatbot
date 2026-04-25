@@ -1,19 +1,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.config import Config
+
+from app.config import Config, configure_logging
 from app.routes.chat import router as chat_router
 from app.schemas import HealthResponse
 
-# Create FastAPI app
+configure_logging()
+
 app = FastAPI(
-    title="MPGU AI Chatbot API",
-    description="AI Assistant for Moscow Pedagogical State University - Powered by Hugging Face",
-    version="4.0.0"
-    description="Hybrid AI assistant API for university support (MPGU) with resilient fallback responses",
-    version="5.0.0"
+    title=Config.APP_NAME,
+    description="Gemini-first chatbot API with local knowledge fallback",
+    version=Config.APP_VERSION,
 )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=Config.ALLOWED_ORIGINS,
@@ -22,49 +21,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routes
 app.include_router(chat_router, prefix="/api/v1")
 
-# Health check endpoint
-@app.get("/")
+
 @app.get("/", response_model=HealthResponse)
-async def root():
-    return {
-        "status": "running",
-        "service": "MPGU AI Chatbot",
-        "version": "4.0.0",
-        "ai_provider": "Hugging Face"
-    }
+async def root() -> HealthResponse:
     return HealthResponse(
         status="running",
-        service="MPGU AI Chatbot",
-        version="5.0.0",
-        ai_provider=f"{Config.AI_PROVIDER} (gemini/openai/huggingface/knowledge supported)",
+        service=Config.APP_NAME,
+        version=Config.APP_VERSION,
+        ai_provider="gemini_only_with_knowledge_fallback",
     )
 
-@app.get("/health")
+
 @app.get("/health", response_model=HealthResponse)
-async def health_check():
-    return {
-        "status": "healthy", 
-        "service": "MPGU Chatbot API",
-        "ai_provider": "Hugging Face"
-    }
+async def health_check() -> HealthResponse:
     return HealthResponse(
         status="healthy",
-        service="MPGU Chatbot API",
-        version="5.0.0",
-        ai_provider=f"{Config.AI_PROVIDER} (gemini/openai/huggingface/knowledge supported)",
+        service=Config.APP_NAME,
+        version=Config.APP_VERSION,
+        ai_provider="gemini_only_with_knowledge_fallback",
     )
 
-# This allows running with: python -m app.main
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "app.main:app",
-        host="0.0.0.0",
-        port=5000,
+        host=Config.API_HOST,
+        port=Config.API_PORT,
         reload=True,
-        log_level="info"
-    )
+        log_level="info",
     )

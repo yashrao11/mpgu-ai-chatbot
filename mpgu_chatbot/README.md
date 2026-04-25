@@ -1,3 +1,6 @@
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 # MPGU Smart Assistant — Placement Edition
 
 A bilingual (English + Russian) university support chatbot built for interview demos and rapid MVP showcasing.
@@ -151,19 +154,119 @@ REQUEST_TIMEOUT_SECONDS=15
 
 Run backend:
 
+=======
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+# MPGU Smart Assistant (Gemini Demo)
+
+MPGU Smart Assistant is a local demo chatbot for interview/placement showcasing.
+
+## Core intent
+- FastAPI backend
+- Simple HTML/CSS/JS frontend
+- **Gemini-only AI integration**
+- Local knowledge-base fallback when Gemini fails (quota/network/parse)
+
+---
+
+## Architecture
+
+- `backend/app/main.py`: FastAPI app + health endpoints + CORS
+- `backend/app/routes/chat.py`: `/api/v1/chat` + history endpoints
+- `backend/app/services/chat_engine.py`: Gemini call flow + intent matching + fallback
+- `backend/data/knowledge_base.json`: domain intent responses
+- `frontend/`: demo UI and metadata badges
+
+---
+
+## API behavior (single response format)
+
+`POST /api/v1/chat` always returns:
+
+```json
+{
+  "reply": "...",
+  "message_id": 1234,
+  "user_id": "test_user",
+  "source": "gemini | knowledge_base | knowledge_fallback",
+  "intent": "general_query | course_registration | ...",
+  "confidence": 0.9,
+  "language": "en | ru",
+  "provider_attempted": "gemini | none",
+  "provider_status": "ok | quota_exceeded | request_failed | parse_failed | not_attempted",
+  "fallback_reason": "gemini_429 | gemini_request_exception | domain_intent | ..."
+}
+```
+
+### Runtime flow
+1. Detect language (`en` / `ru`)
+2. Score domain intent against knowledge base
+3. If intent is strongly domain-specific → return knowledge base response directly
+4. Else call Gemini
+5. If Gemini fails (429/network/parse/http) → fallback response with explicit `provider_status` and `fallback_reason`
+
+---
+
+## Setup
+
+### 1) Backend
+```bash
+cd mpgu_chatbot/backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Update `backend/.env`:
+```env
+AI_PROVIDER=gemini
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=gemini-2.5-flash
+REQUEST_TIMEOUT_SECONDS=20
+```
+
+Run backend:
+<<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
 ```bash
 python run.py
 ```
 
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 ## 2) Frontend
 
 Open second terminal:
 
+=======
+### 2) Frontend
+In another terminal:
+>>>>>>> theirs
+=======
+### 2) Frontend
+In another terminal:
+>>>>>>> theirs
+=======
+### 2) Frontend
+In another terminal:
+>>>>>>> theirs
 ```bash
 cd mpgu_chatbot/frontend
 python -m http.server 3000
 ```
 
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 Open `http://localhost:3000`
 
 ---
@@ -310,10 +413,47 @@ PYTHONPATH=. python - <<'PY'
 from app.services.chat_engine import chat_engine
 print(chat_engine.process('How to register for courses?', 'demo_user'))
 PY
+=======
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+Open:
+- Frontend: `http://127.0.0.1:3000`
+- Health: `http://127.0.0.1:5000/health`
+
+---
+
+## Validation commands
+
+```bash
+curl http://127.0.0.1:5000/health
+```
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/v1/chat \
+-H "Content-Type: application/json" \
+-d '{"message":"Explain machine learning in simple terms","user_id":"test_user"}'
+```
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/v1/chat \
+-H "Content-Type: application/json" \
+-d '{"message":"How do I register for courses?","user_id":"test_user"}'
+<<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
 ```
 
 ---
 
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 ## ⚠️ Current Constraints
 
 - History is in-memory (resets on restart)
@@ -343,3 +483,19 @@ PY
 ## License
 
 No license file is currently included. Add one (MIT/Apache-2.0) before public distribution.
+=======
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+## Notes for demo
+- If Gemini quota is exhausted (`provider_status=quota_exceeded`), frontend shows fallback warning.
+- Fallback mode is intentional for interview reliability.
+- No external infra (DB/auth/docker) is required for this demo.
+<<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs

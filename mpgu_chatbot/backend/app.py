@@ -1,17 +1,15 @@
-"""Compatibility launcher for legacy scripts.
-
-This file keeps backward compatibility for users running `python app.py`.
-It simply starts the FastAPI application defined in `app.main`.
-"""
+"""Compatibility launcher for legacy scripts."""
 
 import uvicorn
+
+from app.config import Config
 
 
 if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
-        host="0.0.0.0",
-        port=5000,
+        host=Config.API_HOST,
+        port=Config.API_PORT,
         reload=True,
         log_level="info",
     )

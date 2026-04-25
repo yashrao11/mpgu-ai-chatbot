@@ -1,8 +1,8 @@
 import json
 import logging
+import random
 import re
 from dataclasses import dataclass
-from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
@@ -10,16 +10,21 @@ import requests
 
 from app.config import Config
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("mpgu_chatbot.chat_engine")
 
 
 @dataclass
 class ChatResult:
     reply: str
+    message_id: int
+    user_id: str
     source: str
     intent: str
     confidence: float
     language: str
+    provider_attempted: str
+    provider_status: str
+    fallback_reason: str | None = None
 
 
 class ChatEngine:
@@ -28,261 +33,262 @@ class ChatEngine:
         self.sessions: dict[str, list[dict[str, str]]] = {}
 
     @staticmethod
-    def _load_knowledge_base() -> dict[str, Any]:
+    def _coerce_responses(value: Any) -> list[str]:
+        if isinstance(value, str):
+            cleaned = value.strip()
+            return [cleaned] if cleaned else []
+        if isinstance(value, list):
+            return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+        return []
+
+    def _normalize_knowledge_base(self, raw_data: dict[str, Any]) -> dict[str, Any]:
+        normalized_intents = []
+        for intent in raw_data.get("intents", []):
+            responses = intent.get("responses", {})
+            use_nested = isinstance(responses, dict) and bool(responses)
+
+            normalized_intents.append(
+                {
+                    "id": intent.get("id", "fallback"),
+                    "keywords": intent.get("keywords", []),
+                    "responses": {
+                        "en": self._coerce_responses(
+                            responses.get("en") if use_nested else intent.get("response_en")
+                        ),
+                        "ru": self._coerce_responses(
+                            responses.get("ru") if use_nested else intent.get("response_ru")
+                        ),
+                    },
+                }
+            )
+
+        fallback = raw_data.get("fallback", {})
+        return {
+            "intents": normalized_intents,
+            "fallback": {
+                "en": self._coerce_responses(fallback.get("en")),
+                "ru": self._coerce_responses(fallback.get("ru")),
+            },
+        }
+
+    def _load_knowledge_base(self) -> dict[str, Any]:
         kb_path = Path(__file__).resolve().parents[2] / "data" / "knowledge_base.json"
         with kb_path.open("r", encoding="utf-8") as fp:
-            return json.load(fp)
+            return self._normalize_knowledge_base(json.load(fp))
 
     @staticmethod
     def detect_language(text: str) -> str:
         russian_chars = len(re.findall(r"[а-яА-ЯёЁ]", text))
         return "ru" if russian_chars > max(1, len(text)) * 0.2 else "en"
 
-    def _score_intent(self, message: str, keywords: list[str]) -> float:
-        message_l = message.lower()
-        token_hits = sum(1 for kw in keywords if kw in message_l)
-        max_similarity = max((SequenceMatcher(None, kw, message_l).ratio() for kw in keywords), default=0.0)
-        return token_hits + max_similarity
+    @staticmethod
+    def _tokenize(text: str) -> list[str]:
+        return re.findall(r"[a-zA-Zа-яА-ЯёЁ0-9]+", text.lower())
+
+    def _intent_score(self, message: str, intent_id: str, keywords: list[str]) -> float:
+        tokens = self._tokenize(message)
+        token_set = set(tokens)
+        text_lower = message.lower()
+
+        score = 0.0
+        for raw_keyword in keywords:
+            keyword = raw_keyword.lower().strip()
+            if not keyword:
+                continue
+
+            if " " in keyword:
+                if keyword in text_lower:
+                    score += 1.0
+                continue
+
+            if intent_id == "greeting":
+                if keyword in token_set:
+                    score += 1.0
+                continue
+
+            if keyword in token_set:
+                score += 1.0
+            elif len(keyword) >= 5 and any(tok.startswith(keyword) for tok in tokens):
+                score += 0.6
+
+        return score
 
     def _match_intent(self, message: str) -> tuple[str, float]:
         best_intent = "fallback"
         best_score = 0.0
 
         for intent in self.knowledge_base["intents"]:
-            score = self._score_intent(message, intent["keywords"])
+            intent_id = intent["id"]
+            score = self._intent_score(message, intent_id, intent["keywords"])
             if score > best_score:
                 best_score = score
-                best_intent = intent["id"]
+                best_intent = intent_id
+
+        tokens = self._tokenize(message)
+        if best_intent == "greeting" and len(tokens) > 5:
+            return "fallback", 0.0
 
         return best_intent, best_score
 
-    def _knowledge_response(self, message: str, language: str) -> ChatResult:
-        intent_id, score = self._match_intent(message)
+    @staticmethod
+    def _is_strong_domain_intent(score: float) -> bool:
+        return score >= 1.0
 
-        if intent_id == "fallback" or score < 0.9:
-            fallback = self.knowledge_base["fallback"][language]
-            return ChatResult(reply=fallback, source="knowledge_fallback", intent="fallback", confidence=0.35, language=language)
+    def _pick_response(self, intent_id: str, language: str) -> str:
+        for intent in self.knowledge_base["intents"]:
+            if intent["id"] == intent_id:
+                candidates = intent["responses"].get(language) or intent["responses"].get("en") or []
+                if candidates:
+                    return random.choice(candidates)
 
-        intent_obj = next(item for item in self.knowledge_base["intents"] if item["id"] == intent_id)
-        field = "response_ru" if language == "ru" else "response_en"
+        fallback_candidates = (
+            self.knowledge_base["fallback"].get(language)
+            or self.knowledge_base["fallback"].get("en")
+            or ["I can help with admissions, courses, schedules, tutors, exams, and contacts."]
+        )
+        return random.choice(fallback_candidates)
 
+    def _build_kb_result(self, user_id: str, language: str, intent_id: str, confidence: float) -> ChatResult:
         return ChatResult(
-            reply=intent_obj[field],
+            reply=self._pick_response(intent_id, language),
+            message_id=random.randint(1000, 9999),
+            user_id=user_id,
             source="knowledge_base",
             intent=intent_id,
-            confidence=min(0.95, 0.45 + score / 4),
+            confidence=confidence,
             language=language,
+            provider_attempted="none",
+            provider_status="not_attempted",
+            fallback_reason="domain_intent",
         )
 
-    def _hugging_face_response(self, message: str, language: str, context: list[dict[str, str]]) -> str | None:
-        if not Config.HUGGING_FACE_TOKEN:
-            return None
-
-        context_window = "\n".join([f"{turn['role']}: {turn['text']}" for turn in context[-4:]])
-        system_prompt = (
-            "You are MPGU Smart Assistant. Provide concise, accurate and structured academic support responses. "
-            "Always answer in the same language as the user."
+    def _build_fallback_result(
+        self,
+        user_id: str,
+        language: str,
+        intent_id: str,
+        provider_status: str,
+        fallback_reason: str,
+    ) -> ChatResult:
+        return ChatResult(
+            reply=self._pick_response(intent_id, language),
+            message_id=random.randint(1000, 9999),
+            user_id=user_id,
+            source="knowledge_fallback" if intent_id == "fallback" else "knowledge_base",
+            intent=intent_id,
+            confidence=0.35 if intent_id == "fallback" else 0.62,
+            language=language,
+            provider_attempted="groq",
+            provider_status=provider_status,
+            fallback_reason=fallback_reason,
         )
-        prompt = (
-            f"{system_prompt}\n\n"
-            f"Conversation so far:\n{context_window}\n\n"
-            f"User question: {message}\n"
-            "Assistant answer:"
-        )
 
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": 220,
-                "temperature": 0.4,
-                "return_full_text": False
-            }
-        }
-        headers = {
-            "Authorization": f"Bearer {Config.HUGGING_FACE_TOKEN}",
-            "Content-Type": "application/json"
-        }
+    def _groq_response(self, message: str, context: list[dict[str, str]]) -> tuple[str, str | None, str | None]:
+        if not Config.GROQ_API_KEY:
+            logger.warning("Groq key missing; skipping provider call")
+            return "request_failed", None, "groq_key_missing"
 
-        try:
-            response = requests.post(
-                Config.HUGGING_FACE_API_URL,
-                headers=headers,
-                json=payload,
-                timeout=Config.REQUEST_TIMEOUT_SECONDS,
-            )
-            if response.status_code != 200:
-                logger.warning("Hugging Face API returned %s", response.status_code)
-                return None
-
-            body = response.json()
-            if isinstance(body, list) and body:
-                return body[0].get("generated_text", "").strip() or None
-            if isinstance(body, dict):
-                return body.get("generated_text", "").strip() or None
-            return None
-        except requests.RequestException:
-            logger.exception("Hugging Face request failed")
-            return None
-        except (ValueError, KeyError, TypeError):
-            logger.exception("Hugging Face response parse failed")
-            return None
-
-    def _openai_response(self, message: str, context: list[dict[str, str]]) -> str | None:
-        if not Config.OPENAI_API_KEY:
-            return None
-
-        context_window = context[-6:]
-        input_messages: list[dict[str, str]] = [
+        messages = [
             {
                 "role": "system",
                 "content": (
-                    "You are MPGU Smart Assistant. Be concise, practical, and answer in the same language "
-                    "as the user. Prefer step-by-step instructions for academic workflows."
+                    "You are MPGU Smart Assistant for a university LMS support demo. "
+                    "Give clear and concise answers. Answer in the same language as the user."
                 ),
             }
         ]
-        for turn in context_window:
+
+        for turn in context[-6:]:
             role = "assistant" if turn["role"] == "assistant" else "user"
-            input_messages.append({"role": role, "content": turn["text"]})
-        input_messages.append({"role": "user", "content": message})
+            messages.append({"role": role, "content": turn["text"]})
+
+        messages.append({"role": "user", "content": message})
+
+        payload = {
+            "model": Config.GROQ_MODEL,
+            "messages": messages,
+            "temperature": 0.3,
+            "max_tokens": 600,
+        }
 
         headers = {
-            "Authorization": f"Bearer {Config.OPENAI_API_KEY}",
+            "Authorization": f"Bearer {Config.GROQ_API_KEY}",
             "Content-Type": "application/json",
         }
-        payload = {
-            "model": Config.OPENAI_MODEL,
-            "input": input_messages,
-            "max_output_tokens": 260,
-        }
+
+        logger.info("Groq request started | model=%s", Config.GROQ_MODEL)
 
         try:
             response = requests.post(
-                Config.OPENAI_API_URL,
+                Config.GROQ_API_URL_TEMPLATE,
                 headers=headers,
                 json=payload,
                 timeout=Config.REQUEST_TIMEOUT_SECONDS,
             )
-            if response.status_code != 200:
-                logger.warning("OpenAI API returned %s", response.status_code)
-                return None
+
+            logger.info("Groq response status | status_code=%s", response.status_code)
+
+            if response.status_code == 429:
+                return "quota_exceeded", None, "groq_429"
+
+            if response.status_code >= 400:
+                return "request_failed", None, f"groq_http_{response.status_code}"
 
             body = response.json()
-            if isinstance(body, dict):
-                if body.get("output_text"):
-                    return str(body["output_text"]).strip() or None
+            choices = body.get("choices", [])
+            if not choices:
+                return "parse_failed", None, "groq_no_choices"
 
-                output_items = body.get("output", [])
-                for item in output_items:
-                    if item.get("type") == "message":
-                        for part in item.get("content", []):
-                            if part.get("type") in {"output_text", "text"} and part.get("text"):
-                                return str(part["text"]).strip() or None
-            return None
+            content = choices[0].get("message", {}).get("content", "").strip()
+            if not content:
+                return "parse_failed", None, "groq_empty_content"
+
+            return "ok", content, None
+
         except requests.RequestException:
-            logger.exception("OpenAI request failed")
-            return None
+            logger.exception("Groq request failed")
+            return "request_failed", None, "groq_request_exception"
         except (ValueError, KeyError, TypeError):
-            logger.exception("OpenAI response parse failed")
-            return None
-
-    def _gemini_response(self, message: str, context: list[dict[str, str]]) -> str | None:
-        if not Config.GEMINI_API_KEY:
-            return None
-
-        recent_turns = context[-6:]
-        conversation_lines = []
-        for turn in recent_turns:
-            prefix = "Assistant" if turn["role"] == "assistant" else "User"
-            conversation_lines.append(f"{prefix}: {turn['text']}")
-        conversation_lines.append(f"User: {message}")
-
-        prompt = (
-            "You are MPGU Smart Assistant. Keep answers clear, concise, and practical. "
-            "Respond in the same language as the user's last question.\n\n"
-            "Conversation:\n"
-            + "\n".join(conversation_lines)
-        )
-
-        url = Config.GEMINI_API_URL_TEMPLATE.format(
-            model=Config.GEMINI_MODEL,
-            api_key=Config.GEMINI_API_KEY,
-        )
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {
-                            "text": prompt
-                        }
-                    ]
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.4,
-                "maxOutputTokens": 260
-            }
-        }
-
-        try:
-            response = requests.post(
-                url,
-                headers={"Content-Type": "application/json"},
-                json=payload,
-                timeout=Config.REQUEST_TIMEOUT_SECONDS,
-            )
-            if response.status_code != 200:
-                logger.warning("Gemini API returned %s", response.status_code)
-                return None
-
-            body = response.json()
-            candidates = body.get("candidates", [])
-            if not candidates:
-                return None
-            parts = candidates[0].get("content", {}).get("parts", [])
-            if not parts:
-                return None
-            text = parts[0].get("text", "")
-            return str(text).strip() or None
-        except requests.RequestException:
-            logger.exception("Gemini request failed")
-            return None
-        except (ValueError, KeyError, TypeError):
-            logger.exception("Gemini response parse failed")
-            return None
+            logger.exception("Groq response parse failed")
+            return "parse_failed", None, "groq_parse_exception"
 
     def process(self, message: str, user_id: str) -> ChatResult:
         language = self.detect_language(message)
         session = self.sessions.setdefault(user_id, [])
 
-        ai_reply = None
-        source = ""
+        intent_id, intent_score = self._match_intent(message)
 
-        if Config.AI_PROVIDER in {"auto", "gemini"}:
-            ai_reply = self._gemini_response(message, session)
-            if ai_reply:
-                source = "gemini"
-
-        if not ai_reply and Config.AI_PROVIDER in {"auto", "openai"}:
-            ai_reply = self._openai_response(message, session)
-            if ai_reply:
-                source = "openai"
-
-        if not ai_reply and Config.AI_PROVIDER in {"auto", "huggingface"}:
-            ai_reply = self._hugging_face_response(message, language, session)
-            if ai_reply:
-                source = "hugging_face"
-
-        if ai_reply:
-            result = ChatResult(
-                reply=ai_reply,
-                source=source,
-                intent="ai_generated",
-                confidence=0.9,
+        if self._is_strong_domain_intent(intent_score) and intent_id != "fallback":
+            result = self._build_kb_result(
+                user_id=user_id,
                 language=language,
+                intent_id=intent_id,
+                confidence=min(0.9, 0.55 + intent_score * 0.1),
             )
         else:
-            result = self._knowledge_response(message, language)
+            provider_status, groq_reply, fallback_reason = self._groq_response(message, session)
+
+            if provider_status == "ok" and groq_reply:
+                result = ChatResult(
+                    reply=groq_reply,
+                    message_id=random.randint(1000, 9999),
+                    user_id=user_id,
+                    source="groq",
+                    intent="general_query",
+                    confidence=0.9,
+                    language=language,
+                    provider_attempted="groq",
+                    provider_status="ok",
+                    fallback_reason=None,
+                )
+            else:
+                result = self._build_fallback_result(
+                    user_id=user_id,
+                    language=language,
+                    intent_id=intent_id if intent_id != "fallback" else "fallback",
+                    provider_status=provider_status,
+                    fallback_reason=fallback_reason or "groq_failed",
+                )
 
         session.append({"role": "user", "text": message})
         session.append({"role": "assistant", "text": result.reply})

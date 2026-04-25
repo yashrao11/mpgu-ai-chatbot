@@ -1,56 +1,81 @@
+import logging
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 
-load_dotenv()
+
+def _split_csv(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+ENV_PATH = BASE_DIR / ".env"
+load_dotenv(ENV_PATH)
+
 
 class Config:
-    # Provider selection: auto | gemini | openai | huggingface | knowledge
-    AI_PROVIDER = os.getenv("AI_PROVIDER", "auto").lower()
+    """Runtime configuration for Groq-based MPGU Smart Assistant backend."""
 
-    # Gemini API configuration
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-    GEMINI_API_URL_TEMPLATE = os.getenv(
-        "GEMINI_API_URL_TEMPLATE",
-        "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
+    BASE_DIR = BASE_DIR
+    ENV_PATH = ENV_PATH
+
+    APP_NAME = "MPGU Smart Assistant API"
+    APP_VERSION = "6.0.0"
+
+    AI_PROVIDER = "groq"
+
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+    GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    GROQ_API_URL_TEMPLATE = os.getenv(
+        "GROQ_API_URL_TEMPLATE",
+        "https://api.groq.com/openai/v1/chat/completions",
     )
 
-    # OpenAI API configuration
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2")
-    OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1/responses")
+    REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "20"))
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper()
 
-    # Hugging Face API Configuration
-    HUGGING_FACE_TOKEN = os.getenv("HUGGING_FACE_TOKEN")
-    
-    # Use a more reliable model
-    # Use a production-grade instruction model
-    HUGGING_FACE_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-base"
-    REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "15"))
-    
-    # Security
-    SECRET_KEY = os.getenv("SECRET_KEY", "mpgu-chatbot-working-2024")
-    
-    # CORS
-    ALLOWED_ORIGINS = [
+    API_HOST = os.getenv("API_HOST", "0.0.0.0")
+    API_PORT = int(os.getenv("API_PORT", "5000"))
+
+    DEFAULT_ALLOWED_ORIGINS = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
         "http://localhost:5000",
         "http://127.0.0.1:5000",
-        "http://localhost:8080"
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
     ]
+    ALLOWED_ORIGINS = _split_csv(os.getenv("ALLOWED_ORIGINS")) or DEFAULT_ALLOWED_ORIGINS
 
-def validate_config():
-    print("✅ MPGU Chatbot configuration validated successfully!")
-    hf_model = Config.HUGGING_FACE_API_URL.rsplit("/", maxsplit=1)[-1]
-    hf_token_status = "set" if Config.HUGGING_FACE_TOKEN else "not set"
-    gemini_key_status = "set" if Config.GEMINI_API_KEY else "not set"
-    openai_token_status = "set" if Config.OPENAI_API_KEY else "not set"
+
+def validate_config() -> None:
+    groq_key_status = "set" if Config.GROQ_API_KEY else "not set"
     print(
-        "✅ MPGU Chatbot configuration validated | "
+        "✅ Configuration validated | "
+        f"env={Config.ENV_PATH} | "
         f"provider={Config.AI_PROVIDER} | "
-        f"gemini_model={Config.GEMINI_MODEL} | gemini_key={gemini_key_status} | "
-        f"openai_model={Config.OPENAI_MODEL} | openai_key={openai_token_status} | "
-        f"hf_model={hf_model} | hf_token={hf_token_status}"
+        f"groq_model={Config.GROQ_MODEL} | "
+        f"groq_key={groq_key_status} | "
+        f"origins={len(Config.ALLOWED_ORIGINS)} | "
+        f"log_level={Config.LOG_LEVEL}"
     )
-mpgu_chatbot/backend/app/main.py
+
+
+def configure_logging() -> None:
+    logger = logging.getLogger("mpgu_chatbot")
+    level = getattr(logging, Config.LOG_LEVEL, logging.INFO)
+
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+        )
+        logger.addHandler(handler)
+
+    logger.setLevel(level)
+    logger.propagate = False

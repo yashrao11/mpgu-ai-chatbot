@@ -1,7 +1,14 @@
 class MPGUChatbot {
     constructor() {
-        this.backendBase = 'http://localhost:5000';
+        let host = window.location.hostname || '127.0.0.1';
+
+        if (host === '::' || host === '::1' || host === '[::]' || host === '[::1]') {
+        host = '127.0.0.1';
+        }
+
+        this.backendBase = `http://${host}:5000`;
         this.chatEndpoint = `${this.backendBase}/api/v1/chat`;
+
         this.messagesContainer = document.getElementById('chatMessages');
         this.messageInput = document.getElementById('messageInput');
         this.sendButton = document.getElementById('sendButton');
@@ -23,9 +30,8 @@ class MPGUChatbot {
 
     getOrCreateUserId() {
         const existing = localStorage.getItem('mpgu_user_id');
-        if (existing) {
-            return existing;
-        }
+        if (existing) return existing;
+
         const created = `user_${Math.random().toString(36).slice(2, 10)}`;
         localStorage.setItem('mpgu_user_id', created);
         return created;
@@ -63,14 +69,14 @@ class MPGUChatbot {
                 throw new Error(`HTTP ${response.status}`);
             }
 
-            const body = await response.json();
+            const data = await response.json();
             this.isConnected = true;
-            this.setStatus('connected', body.ai_provider || 'Connected');
-            this.addSystemMessage('✅ Connected. Ready for interview demo mode.');
+            this.setStatus('connected', data.ai_provider || 'Connected');
+            this.addSystemMessage('✅ Backend connected. Gemini mode is ready for demo.');
         } catch (error) {
             this.isConnected = false;
             this.setStatus('error', 'Backend offline');
-            this.addSystemMessage('❌ Backend not reachable at http://localhost:5000');
+            this.addSystemMessage(`❌ Cannot connect to backend at ${this.backendBase}`);
         }
     }
 
@@ -87,20 +93,24 @@ class MPGUChatbot {
     }
 
     async sendMessage() {
-        const text = this.messageInput.value.trim();
-        if (!text) {
-            return;
-        }
+        const message = this.messageInput.value.trim();
+        if (!message) return;
 
-        this.addMessage(text, 'user');
+        this.addMessage(message, 'user');
         this.messageInput.value = '';
         this.sendButton.disabled = true;
 
         if (!this.isConnected) {
-            this.addMessage('Backend server is not connected. Start backend with: python run.py', 'bot', {
-                source: 'client',
-                isError: true
-            });
+            this.addMessage(
+                'Backend is offline. Start backend with `python run.py` in `mpgu_chatbot/backend`.',
+                'bot',
+                {
+                    source: 'client',
+                    isError: true
+                }
+            );
+            this.sendButton.disabled = false;
+            this.messageInput.focus();
             return;
         }
 
@@ -110,26 +120,31 @@ class MPGUChatbot {
             const response = await fetch(this.chatEndpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: text,
-                    user_id: this.userId
-                })
+                body: JSON.stringify({ message, user_id: this.userId })
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP ${response.status}: ${errorText}`);
+                const err = await response.text();
+                throw new Error(`HTTP ${response.status}: ${err}`);
             }
 
             const data = await response.json();
             this.addMessage(data.reply, 'bot', {
                 source: data.source,
-                language: data.language,
                 intent: data.intent,
-                confidence: data.confidence
+                language: data.language,
+                confidence: data.confidence,
+                providerStatus: data.provider_status,
+                fallbackReason: data.fallback_reason
             });
+
+            if (data.provider_status === 'quota_exceeded') {
+                this.addSystemMessage('⚠️ Gemini quota exhausted. Fallback mode is active right now.');
+            } else if (data.provider_status !== 'ok' && data.provider_attempted === 'gemini') {
+                this.addSystemMessage('⚠️ Gemini temporarily unavailable. Showing fallback response.');
+            }
         } catch (error) {
-            this.addMessage(`Error: ${error.message}`, 'bot', {
+            this.addMessage(`Request failed: ${error.message}`, 'bot', {
                 source: 'client',
                 isError: true
             });
@@ -146,15 +161,23 @@ class MPGUChatbot {
                 method: 'DELETE'
             });
         } catch {
-            // Ignore network errors when clearing history
+            // Keep UI clear action working even if network call fails.
         }
 
         this.messagesContainer.innerHTML = '';
-        this.addSystemMessage('🧹 Chat history cleared for this user session.');
+        this.addSystemMessage('🧹 Chat history cleared for this demo session.');
     }
 
     addMessage(content, sender, options = {}) {
-        const { source = '', language = '', intent = '', confidence = null, isError = false } = options;
+        const {
+            source = '',
+            intent = '',
+            language = '',
+            confidence = null,
+            providerStatus = '',
+            fallbackReason = '',
+            isError = false
+        } = options;
 
         const message = document.createElement('article');
         message.className = `message ${sender}-message ${isError ? 'error-message' : ''}`;
@@ -168,9 +191,11 @@ class MPGUChatbot {
 
         const badges = [];
         if (source) badges.push(`source: ${source}`);
-        if (language) badges.push(`lang: ${language}`);
         if (intent) badges.push(`intent: ${intent}`);
+        if (language) badges.push(`lang: ${language}`);
         if (confidence !== null && confidence !== undefined) badges.push(`confidence: ${confidence}`);
+        if (providerStatus) badges.push(`provider_status: ${providerStatus}`);
+        if (fallbackReason) badges.push(`fallback_reason: ${fallbackReason}`);
 
         badges.forEach((text) => {
             const badge = document.createElement('span');
@@ -184,17 +209,15 @@ class MPGUChatbot {
         timeEl.textContent = this.getCurrentTime();
 
         message.appendChild(contentEl);
-        if (badges.length) {
-            message.appendChild(metaEl);
-        }
+        if (badges.length) message.appendChild(metaEl);
         message.appendChild(timeEl);
 
         this.messagesContainer.appendChild(message);
         this.scrollToBottom();
     }
 
-    addSystemMessage(text) {
-        this.addMessage(text, 'bot', { source: 'system' });
+    addSystemMessage(content) {
+        this.addMessage(content, 'bot', { source: 'system' });
     }
 
     formatMessage(content) {
@@ -223,9 +246,7 @@ class MPGUChatbot {
 
     hideTypingIndicator() {
         const node = document.getElementById('typingIndicator');
-        if (node) {
-            node.remove();
-        }
+        if (node) node.remove();
     }
 
     scrollToBottom() {

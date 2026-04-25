@@ -1,3 +1,6 @@
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 # MPGU LMS Chatbot – Project Positioning Guide (for Interviews)
 
 This document helps you explain this project as an **international academic product prototype** and improve it quickly for placements (Morgan Stanley and others).
@@ -163,3 +166,50 @@ Use measurable, engineering-focused bullets like:
 - Don’t hide limitations; explain roadmap and tradeoffs confidently.
 
 Honesty + clarity + roadmap = strong impression.
+=======
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+# MPGU Smart Assistant — Interview Positioning Guide (Gemini Edition)
+
+Use this to present the project clearly in placements/interviews.
+
+## 1) One-line project pitch
+Built a bilingual university support assistant with a Gemini-first response path and a deterministic knowledge-base fallback for reliability.
+
+## 2) What you actually built
+- FastAPI backend with typed request/response models
+- Gemini API integration for open-ended questions
+- Knowledge-base intent engine for LMS/domain questions
+- Fallback handling for quota/network/parse failures
+- Frontend chat UI with connection status and response metadata
+
+## 3) Strong technical talking points
+- Why fallback architecture matters in demos (stability under quota/network issues)
+- How provider telemetry is exposed (`provider_status`, `fallback_reason`)
+- Why intent-first domain routing improves consistency for LMS workflows
+- How you avoided false keyword matches (`hi` inside `machine` issue)
+
+## 4) Honest project status
+- Production style structure, but local demo deployment
+- In-memory history (no database)
+- No auth/roles intentionally to keep scope focused for demo
+
+## 5) Interview-ready CV bullets
+- Built a Gemini-first FastAPI chatbot for university LMS support with robust fallback behavior.
+- Implemented intent-based domain routing and explicit provider failure telemetry for reliable demos.
+- Designed a frontend chat UI that surfaces backend state and fallback metadata for transparent UX.
+
+## 6) Demo script (2 minutes)
+1. Ask a domain query: "How do I register for courses?" → knowledge base response.
+2. Ask a general query: "Explain machine learning in simple terms" → Gemini response (or fallback if quota/network issue).
+3. Point out metadata badges (`source`, `intent`, `language`, `provider_status`, `fallback_reason`).
+4. Show `/health` endpoint and explain Gemini-only architecture.
+<<<<<<< ours
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
+=======
+>>>>>>> theirs
