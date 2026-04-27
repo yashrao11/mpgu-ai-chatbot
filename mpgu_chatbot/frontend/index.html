@@ -1,61 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MPGU Smart Assistant • Gemini Demo</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MPGU Smart Assistant • Groq Demo</title>
+    <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-    <div class="chat-container">
-        <header class="chat-header">
-            <div class="header-content">
-                <div class="logo">🎓</div>
-                <div class="header-text">
+    <div class="app-shell">
+        <aside class="sidebar">
+            <section class="brand-card">
+                <div class="brand-icon">🎓</div>
+                <div>
                     <h1>MPGU Smart Assistant</h1>
-                    <p>Groq-first • Knowledge fallback for reliability</p>
+                    <p>Groq-powered LMS assistant</p>
                 </div>
-                <div class="status-wrap">
-                    <span class="status-label" id="statusLabel">Checking...</span>
-                    <span class="status-indicator" id="statusIndicator"></span>
-                </div>
-            </div>
-        </header>
+            </section>
 
-        <section class="quick-actions" id="quickActions">
-            <button class="chip" data-msg="How can I apply for admission?">Admissions</button>
-            <button class="chip" data-msg="How do I register for courses?">Course Registration</button>
-            <button class="chip" data-msg="Show me schedule guidance">Schedule</button>
-            <button class="chip" data-msg="How to find tutors?">Tutors</button>
-            <button class="chip" data-msg="Контакты МПГУ">Контакты</button>
-        </section>
+            <section class="side-card">
+                <div class="card-title">User Role</div>
+                <select id="roleSelect">
+                    <option value="student">Student</option>
+                    <option value="faculty">Faculty</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </section>
 
-        <main class="chat-messages" id="chatMessages">
-            <article class="message bot-message">
-                <div class="message-content">
-                    <strong>MPGU Assistant:</strong> Welcome! Ask me about admissions, courses, schedules, tutors, exams, or contacts.
-                    <br><br>
-                    You can ask in English or Russian. I will answer step-by-step.
+            <section class="side-card status-card">
+                <div class="card-title">System Status</div>
+                <div class="status-row">
+                    <span class="status-dot pending" id="statusIndicator"></span>
+                    <span id="statusLabel">Checking backend...</span>
                 </div>
-                <div class="message-meta">
-                    <span class="badge">source: system</span>
+                <p class="small-text" id="backendUrl">Backend: 127.0.0.1:5000</p>
+            </section>
+
+            <section class="side-card">
+                <div class="card-title">LMS Help</div>
+                <button class="prompt-btn" data-msg="How do I register for courses?">Course registration</button>
+                <button class="prompt-btn" data-msg="How can I contact tutors?">Contact tutors</button>
+                <button class="prompt-btn" data-msg="Show me schedule guidance">Schedule guidance</button>
+            </section>
+
+            <section class="side-card">
+                <div class="card-title">Academic Assistant</div>
+                <button class="prompt-btn" data-msg="Explain machine learning in simple terms">Explain machine learning</button>
+                <button class="prompt-btn" data-msg="Generate a short quiz on operating systems">Generate quiz</button>
+                <button class="prompt-btn" data-msg="Summarize notes about database normalization">Summarize notes</button>
+            </section>
+
+            <section class="side-card">
+                <div class="card-title">Interview Demo</div>
+                <button class="prompt-btn" data-msg="Explain how this chatbot architecture works">Explain architecture</button>
+                <button class="prompt-btn" data-msg="What makes this project reliable?">Reliability story</button>
+            </section>
+        </aside>
+
+        <main class="chat-panel">
+            <header class="chat-topbar">
+                <div>
+                    <p class="eyebrow">Placement Edition</p>
+                    <h2>International LMS AI Assistant</h2>
+                    <p>Intent detection, knowledge-base routing, Groq responses, and safe fallback metadata.</p>
                 </div>
-            </article>
+                <button id="clearButton" class="ghost-button">Clear chat</button>
+            </header>
+
+            <section class="chat-messages" id="chatMessages">
+                <article class="message bot-message">
+                    <div class="avatar">AI</div>
+                    <div class="bubble">
+                        <div class="message-content">
+                            <strong>Welcome!</strong> I can help with LMS workflows, academic explanations, quizzes, notes, and interview-demo questions.
+                            <br /><br />
+                            Try <strong>“Explain machine learning”</strong> to test Groq or <strong>“How do I register for courses?”</strong> to test the knowledge base.
+                        </div>
+                        <div class="message-meta">
+                            <span class="badge">source: system</span>
+                        </div>
+                    </div>
+                </article>
+            </section>
+
+            <footer class="composer">
+                <div class="input-shell">
+                    <input
+                        type="text"
+                        id="messageInput"
+                        placeholder="Ask about LMS, courses, academics, or project architecture..."
+                        maxlength="800"
+                    />
+                    <button id="sendButton" disabled>Send</button>
+                </div>
+                <p class="hint">Metadata badges show whether the answer came from Groq, knowledge base, or fallback.</p>
+            </footer>
         </main>
-
-        <footer class="chat-input-container">
-            <div class="input-wrapper">
-                <input
-                    type="text"
-                    id="messageInput"
-                    placeholder="Ask your question..."
-                    maxlength="800"
-                >
-                <button id="sendButton" class="send-button" disabled>Send</button>
-                <button id="clearButton" class="secondary-button">Clear</button>
-            </div>
-            <p class="hint">Tip: Ask specific questions to get better answers.</p>
-        </footer>
     </div>
 
     <script src="script.js"></script>

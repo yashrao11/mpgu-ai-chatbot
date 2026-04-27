@@ -1,12 +1,6 @@
 class MPGUChatbot {
     constructor() {
-        let host = window.location.hostname || '127.0.0.1';
-
-        if (host === '::' || host === '::1' || host === '[::]' || host === '[::1]') {
-        host = '127.0.0.1';
-        }
-
-        this.backendBase = `http://${host}:5000`;
+        this.backendBase = 'http://127.0.0.1:5000';
         this.chatEndpoint = `${this.backendBase}/api/v1/chat`;
 
         this.messagesContainer = document.getElementById('chatMessages');
@@ -15,7 +9,9 @@ class MPGUChatbot {
         this.clearButton = document.getElementById('clearButton');
         this.statusIndicator = document.getElementById('statusIndicator');
         this.statusLabel = document.getElementById('statusLabel');
-        this.quickActions = document.getElementById('quickActions');
+        this.backendUrl = document.getElementById('backendUrl');
+        this.quickActions = document.querySelectorAll('.prompt-btn');
+        this.roleSelect = document.getElementById('roleSelect');
 
         this.userId = this.getOrCreateUserId();
         this.isConnected = false;
@@ -24,6 +20,7 @@ class MPGUChatbot {
     }
 
     init() {
+        this.backendUrl.textContent = `Backend: ${this.backendBase}`;
         this.setupEventListeners();
         this.testConnection();
     }
@@ -52,27 +49,25 @@ class MPGUChatbot {
             this.sendButton.disabled = !this.messageInput.value.trim();
         });
 
-        this.quickActions.addEventListener('click', (event) => {
-            if (event.target.classList.contains('chip')) {
-                this.messageInput.value = event.target.dataset.msg || '';
+        this.quickActions.forEach((button) => {
+            button.addEventListener('click', () => {
+                this.messageInput.value = button.dataset.msg || '';
                 this.sendButton.disabled = !this.messageInput.value.trim();
                 this.messageInput.focus();
-            }
+            });
         });
     }
 
     async testConnection() {
-        this.setStatus('connecting');
+        this.setStatus('connecting', 'Connecting...');
         try {
             const response = await fetch(`${this.backendBase}/health`);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
             const data = await response.json();
             this.isConnected = true;
-            this.setStatus('connected', data.ai_provider || 'Connected');
-            this.addSystemMessage('✅ Backend connected. Gemini mode is ready for demo.');
+            this.setStatus('connected', data.ai_provider || 'Groq backend connected');
+            this.addSystemMessage('✅ Backend connected. Groq demo mode is ready.');
         } catch (error) {
             this.isConnected = false;
             this.setStatus('error', 'Backend offline');
@@ -82,13 +77,13 @@ class MPGUChatbot {
 
     setStatus(status, label = '') {
         const map = {
-            connected: { color: '#16a34a', text: 'Connected' },
-            connecting: { color: '#f59e0b', text: 'Connecting' },
-            error: { color: '#dc2626', text: 'Disconnected' }
+            connected: { className: 'online', text: 'Connected' },
+            connecting: { className: 'pending', text: 'Connecting' },
+            error: { className: 'offline', text: 'Disconnected' }
         };
 
         const state = map[status] || map.error;
-        this.statusIndicator.style.background = state.color;
+        this.statusIndicator.className = `status-dot ${state.className}`;
         this.statusLabel.textContent = label || state.text;
     }
 
@@ -102,12 +97,9 @@ class MPGUChatbot {
 
         if (!this.isConnected) {
             this.addMessage(
-                'Backend is offline. Start backend with `python run.py` in `mpgu_chatbot/backend`.',
+                'Backend is offline. Start backend with `python run.py` inside `mpgu_chatbot/backend`.',
                 'bot',
-                {
-                    source: 'client',
-                    isError: true
-                }
+                { source: 'client', isError: true }
             );
             this.sendButton.disabled = false;
             this.messageInput.focus();
@@ -120,15 +112,20 @@ class MPGUChatbot {
             const response = await fetch(this.chatEndpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message, user_id: this.userId })
+                body: JSON.stringify({
+                    message,
+                    user_id: this.userId,
+                    user_role: this.roleSelect.value
+                })
             });
 
             if (!response.ok) {
-                const err = await response.text();
-                throw new Error(`HTTP ${response.status}: ${err}`);
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
             }
 
             const data = await response.json();
+
             this.addMessage(data.reply, 'bot', {
                 source: data.source,
                 intent: data.intent,
@@ -139,9 +136,9 @@ class MPGUChatbot {
             });
 
             if (data.provider_status === 'quota_exceeded') {
-                this.addSystemMessage('⚠️ Gemini quota exhausted. Fallback mode is active right now.');
-            } else if (data.provider_status !== 'ok' && data.provider_attempted === 'gemini') {
-                this.addSystemMessage('⚠️ Gemini temporarily unavailable. Showing fallback response.');
+                this.addSystemMessage('⚠️ Groq quota or rate limit reached. Knowledge fallback is active.');
+            } else if (data.provider_status !== 'ok' && data.provider_attempted === 'groq') {
+                this.addSystemMessage('⚠️ Groq was unavailable for this request. Showing fallback response.');
             }
         } catch (error) {
             this.addMessage(`Request failed: ${error.message}`, 'bot', {
@@ -161,11 +158,15 @@ class MPGUChatbot {
                 method: 'DELETE'
             });
         } catch {
-            // Keep UI clear action working even if network call fails.
+            // UI should still clear even if backend history clear fails.
         }
 
         this.messagesContainer.innerHTML = '';
         this.addSystemMessage('🧹 Chat history cleared for this demo session.');
+    }
+
+    addSystemMessage(content) {
+        this.addMessage(content, 'bot', { source: 'system' });
     }
 
     addMessage(content, sender, options = {}) {
@@ -179,8 +180,15 @@ class MPGUChatbot {
             isError = false
         } = options;
 
-        const message = document.createElement('article');
-        message.className = `message ${sender}-message ${isError ? 'error-message' : ''}`;
+        const wrapper = document.createElement('article');
+        wrapper.className = `message ${sender}-message ${isError ? 'error-message' : ''}`;
+
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar';
+        avatar.textContent = sender === 'user' ? 'You' : 'AI';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
 
         const contentEl = document.createElement('div');
         contentEl.className = 'message-content';
@@ -208,20 +216,22 @@ class MPGUChatbot {
         timeEl.className = 'message-time';
         timeEl.textContent = this.getCurrentTime();
 
-        message.appendChild(contentEl);
-        if (badges.length) message.appendChild(metaEl);
-        message.appendChild(timeEl);
+        bubble.appendChild(contentEl);
+        if (badges.length) bubble.appendChild(metaEl);
+        bubble.appendChild(timeEl);
 
-        this.messagesContainer.appendChild(message);
+        wrapper.appendChild(avatar);
+        wrapper.appendChild(bubble);
+
+        this.messagesContainer.appendChild(wrapper);
         this.scrollToBottom();
     }
 
-    addSystemMessage(content) {
-        this.addMessage(content, 'bot', { source: 'system' });
-    }
-
     formatMessage(content) {
-        return content
+        return String(content)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
@@ -230,14 +240,17 @@ class MPGUChatbot {
 
     showTypingIndicator() {
         const typingEl = document.createElement('article');
-        typingEl.className = 'typing-indicator';
+        typingEl.className = 'message bot-message typing-indicator';
         typingEl.id = 'typingIndicator';
         typingEl.innerHTML = `
-            <span>Assistant is thinking</span>
-            <div class="typing-dots">
-                <span class="typing-dot"></span>
-                <span class="typing-dot"></span>
-                <span class="typing-dot"></span>
+            <div class="avatar">AI</div>
+            <div class="bubble typing-bubble">
+                <span>Assistant is thinking</span>
+                <div class="typing-dots">
+                    <span class="typing-dot"></span>
+                    <span class="typing-dot"></span>
+                    <span class="typing-dot"></span>
+                </div>
             </div>
         `;
         this.messagesContainer.appendChild(typingEl);

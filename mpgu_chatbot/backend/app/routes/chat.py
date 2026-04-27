@@ -1,5 +1,4 @@
 from dataclasses import asdict
-
 from fastapi import APIRouter, HTTPException
 
 from app.schemas import ChatHistoryResponse, ChatMessage, ChatReply, ClearHistoryResponse
