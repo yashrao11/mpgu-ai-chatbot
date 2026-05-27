@@ -12,7 +12,7 @@ class ChatReply(BaseModel):
     reply: str
     message_id: int
     user_id: str
-    source: Literal["groq", "knowledge_base", "knowledge_fallback"]
+    source: Literal["groq", "knowledge_base", "knowledge_fallback", "rag"]
     intent: str
     confidence: float
     language: Literal["en", "ru"]
