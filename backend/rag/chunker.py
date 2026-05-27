@@ -8,7 +8,7 @@ PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class TextChunker:
-    def __init__(self, chunk_size=300, overlap=50):
+    def __init__(self, chunk_size=100, overlap=10):
         self.chunk_size = chunk_size
         self.overlap = overlap
 
