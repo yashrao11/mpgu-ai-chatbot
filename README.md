@@ -1,455 +1,580 @@
-<<<<<<< ours
-# MPGU Smart Assistant — Placement Edition
+````md
+# MPGU Smart Assistant
 
-A bilingual (English + Russian) university support chatbot built for interview demos and rapid MVP showcasing.
+A bilingual university assistant for **Moscow Pedagogical State University (MPGU)** built as a full **Retrieval-Augmented Generation (RAG)** system.
 
-This version is designed to be **reliable in live interviews**:
-- Works with **Gemini API**, **OpenAI API**, or **Hugging Face API** when token is available.
-- Gracefully falls back to a **knowledge-base intent engine** when API is missing/fails.
-- Exposes conversation metadata (`source`, `intent`, `confidence`, `language`) to demonstrate engineering depth.
+This project combines:
 
----
+* **official MPGU website crawling**
+* **PDF ingestion**
+* **text chunking**
+* **vector embeddings**
+* **semantic search with ChromaDB**
+* **Groq-based answer generation**
+* **FastAPI backend**
+* **HTML/CSS/JavaScript frontend**
 
-## ✨ Highlights
-
-- Hybrid response pipeline (AI + deterministic fallback)
-- Bilingual support (English/Russian)
-- FastAPI backend with typed schemas
-- Session-based chat history endpoints
-- Frontend with quick prompts and metadata badges
-- Clear health and diagnostics endpoints
+The result is a university support chatbot that can answer questions about admissions, international students, programs, faculty structure, contacts, and related MPGU information using official source material.
 
 ---
 
-## 🧱 Tech Stack
+## What this project demonstrates
+
+This repository is designed to show a complete modern AI workflow, not just a simple chatbot.
+
+It demonstrates:
+
+* how to collect data from a live university website
+* how to extract text from PDFs
+* how to turn documents into chunks
+* how to convert chunks into embeddings
+* how to store and search embeddings in a vector database
+* how to retrieve relevant context for a user query
+* how to pass that context to an LLM
+* how to return a grounded answer through an API
+
+---
+
+## Key idea
+
+The chatbot does **not** rely only on hardcoded answers.
+
+Instead, it uses a two-layer knowledge system:
+
+1. **Static fallback knowledge**
+   * used for greetings and safe fallback behavior
+   * stored in `data/knowledge_base.json`
+
+2. **RAG knowledge layer**
+   * built from MPGU website pages and PDFs
+   * stored as embeddings in ChromaDB
+   * used for most factual questions
+
+That means the assistant can answer from official MPGU content rather than only from prewritten responses.
+
+---
+
+## Project highlights
+
+* Bilingual support: English and Russian
+* Official MPGU website crawler
+* PDF ingestion pipeline
+* Semantic retrieval using embeddings
+* ChromaDB vector store
+* Groq LLM integration
+* FastAPI backend with typed schemas
+* Chat history endpoints
+* Conversation memory during runtime
+* Frontend chat interface with metadata badges
+* Clean separation of ingestion, retrieval, and generation layers
+
+---
+
+## Architecture overview
+
+### Online chat flow
+
+```text
+User
+  ↓
+Frontend (HTML/CSS/JS)
+  ↓ fetch()
+FastAPI backend
+  ↓
+app/routes/chat.py
+  ↓
+app/services/chat_engine.py
+  ↓
+rag/retriever.py
+  ↓
+ChromaDB vector store
+  ↓
+Relevant chunks
+  ↓
+Groq LLM
+  ↓
+Final answer
+  ↓
+Frontend UI
+````
+
+### Offline knowledge-building flow
+
+```text
+MPGU website pages / PDFs
+  ↓
+ingestion/crawler.py / ingestion/pdf_loader.py
+  ↓
+data/raw/*.txt
+  ↓
+rag/chunker.py
+  ↓
+rag/embed_store.py
+  ↓
+data/vector_store/
+```
+
+---
+
+## Tech stack
 
 ### Backend
-- Python 3.10+
-- FastAPI
-- Uvicorn
-- Pydantic
-- Requests
-- python-dotenv
+
+* Python 3.11+
+* FastAPI
+* Uvicorn
+* Pydantic
+* Requests
+* python-dotenv
+
+### RAG / AI layer
+
+* sentence-transformers
+* ChromaDB
+* Groq LLM
+* PyMuPDF for PDFs
+
+### Web crawling / parsing
+
+* requests
+* BeautifulSoup4
+* lxml
 
 ### Frontend
-- HTML + CSS + Vanilla JavaScript
 
-### AI Layer
-- Gemini API (`gemini-2.5-flash` by default)
-- OpenAI Responses API (`gpt-5.2` by default)
-- Hugging Face Inference API (`google/flan-t5-base`)
-- Local knowledge base (`backend/data/knowledge_base.json`)
+* HTML
+* CSS
+* Vanilla JavaScript
 
 ---
 
-## 📁 Project Structure
+## Repository structure
 
 ```text
 mpgu_chatbot/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py                  # FastAPI app + middleware + health
-│   │   ├── config.py                # Env config
-│   │   ├── schemas.py               # Pydantic request/response models
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── main.py
+│   │   ├── schemas.py
 │   │   ├── routes/
-│   │   │   └── chat.py              # Chat + history routes
+│   │   │   ├── __init__.py
+│   │   │   └── chat.py
 │   │   └── services/
-│   │       └── chat_engine.py       # Hybrid response engine
+│   │       └── chat_engine.py
 │   ├── data/
-│   │   └── knowledge_base.json      # Intent keywords and bilingual replies
+│   │   ├── knowledge_base.json
+│   │   ├── raw/
+│   │   ├── processed/
+│   │   └── vector_store/
+│   ├── ingestion/
+│   │   ├── clean_text.py
+│   │   ├── crawler.py
+│   │   ├── pdf_loader.py
+│   │   ├── urls.py
+│   │   └── pdfs/
+│   ├── rag/
+│   │   ├── __init__.py
+│   │   ├── chunker.py
+│   │   ├── embed_store.py
+│   │   └── retriever.py
 │   ├── requirements.txt
-│   └── run.py                       # Local runner
+│   └── run.py
 ├── frontend/
 │   ├── index.html
 │   ├── script.js
 │   └── styles.css
-├── README.md
-└── PROJECT_POSITIONING_GUIDE.md
+└── README.md
 ```
 
 ---
 
-## 🧠 Response Pipeline
+## How the system works
 
-1. User sends message from frontend.
-2. Backend tries Gemini first (default in `auto` mode), then OpenAI, then Hugging Face.
-3. If unavailable/low reliability, backend answers from intent knowledge base.
-4. Backend returns response + metadata:
-   - `source`: `gemini`, `openai`, `hugging_face`, `knowledge_base`, or `knowledge_fallback`
-   - `intent`
-   - `confidence`
-   - `language`
+### 1. Data collection
 
-This gives you strong talking points for reliability and fallback design in interviews.
+The project starts by collecting knowledge from MPGU official sources.
+
+#### Website crawling
+
+The crawler visits MPGU website pages and extracts visible text.
+
+Important pages include:
+
+* homepage
+* admissions pages
+* structure pages
+* education/program pages
+* international relations pages
+* news and announcements
+* contact pages
+
+#### PDF ingestion
+
+PDF files can be placed in:
+
+```text
+backend/ingestion/pdfs/
+```
+
+The PDF loader extracts text from those PDFs and saves the cleaned output into `backend/data/raw/`.
 
 ---
 
-## 🔌 API Endpoints
+### 2. Raw text storage
 
-Base URL: `http://localhost:5000`
+All extracted source text is stored as plain `.txt` files in:
 
-### `GET /`
-Service info.
-
-### `GET /health`
-Health endpoint with version/provider mode.
-
-### `POST /api/v1/chat`
-Chat endpoint.
-
-**Request**
-```json
-{
-  "message": "How do I register for courses?",
-  "user_id": "user_abc123"
-}
+```text
+backend/data/raw/
 ```
 
-**Response**
-```json
-{
-  "reply": "Course registration flow: ...",
-  "message_id": 3241,
-  "user_id": "user_abc123",
-  "source": "knowledge_base",
-  "intent": "course_registration",
-  "confidence": 0.73,
-  "language": "en"
-}
-```
-
-### `GET /api/v1/chat/history/{user_id}`
-Returns in-memory conversation history for a user.
-
-### `DELETE /api/v1/chat/history/{user_id}`
-Clears a user chat session.
+Both website content and PDF content are normalized into the same format: plain text.
 
 ---
 
-## 🚀 Quick Start (Local)
+### 3. Chunking
 
-## 1) Backend
+The chunker reads every `.txt` file in `data/raw/` and splits the text into smaller overlapping chunks.
+
+Why this matters:
+
+* improves retrieval accuracy
+* avoids large-context noise
+* keeps semantic coherence
+
+Example:
+
+If chunk size is 100 and overlap is 10:
+
+* Chunk 1: 1–100
+* Chunk 2: 91–190
+* Chunk 3: 181–280
+
+---
+
+### 4. Embeddings
+
+Each chunk is converted into a vector using:
+
+```python
+SentenceTransformer("all-MiniLM-L6-v2")
+```
+
+This model maps semantic meaning into vector space.
+
+Example similarity:
+
+* “admission process”
+* “how to apply for university”
+
+---
+
+### 5. Vector storage with ChromaDB
+
+Stored in:
+
+```text
+backend/data/vector_store/
+```
+
+ChromaDB stores:
+
+* embeddings
+* metadata
+* chunk text
+* document IDs
+
+---
+
+### 6. Retrieval
+
+When a query is received:
+
+1. Query is embedded
+2. Compared with stored vectors
+3. Top-k similar chunks are retrieved
+4. Passed as context
+
+---
+
+### 7. Answer generation
+
+Groq LLM receives:
+
+* system prompt
+* retrieved context
+* user query
+* chat history
+
+Then generates grounded response.
+
+---
+
+## Backend modules
+
+### run.py
+
+Starts FastAPI server via Uvicorn.
+
+### app/main.py
+
+App entry point, CORS, routing.
+
+### app/routes/chat.py
+
+Handles:
+
+* `/chat`
+* history endpoints
+
+### app/services/chat_engine.py
+
+Core orchestration:
+
+* routing logic
+* RAG pipeline
+* LLM calls
+
+### app/schemas.py
+
+Pydantic models for request/response validation.
+
+### app/config.py
+
+Environment + API configuration.
+
+---
+
+## Ingestion modules
+
+### crawler.py
+
+Crawls MPGU website and extracts text.
+
+### pdf_loader.py
+
+Extracts PDF text using PyMuPDF.
+
+### clean_text.py
+
+Normalizes extracted text.
+
+### urls.py
+
+Seed URLs for crawling.
+
+---
+
+## RAG modules
+
+### chunker.py
+
+Splits raw text into overlapping chunks.
+
+### embed_store.py
+
+Creates embeddings and stores in ChromaDB.
+
+### retriever.py
+
+Performs semantic search.
+
+---
+
+## Data directories
+
+### data/raw/
+
+Raw extracted text.
+
+### data/vector_store/
+
+ChromaDB storage.
+
+### data/processed/
+
+Optional intermediate outputs.
+
+### knowledge_base.json
+
+Fallback responses.
+
+---
+
+## Runtime flow
+
+1. User sends message
+2. Frontend sends request
+3. FastAPI receives it
+4. chat_engine processes it
+5. Retriever finds context
+6. Groq generates answer
+7. Response returned to UI
+
+---
+
+## Semantic search behavior
+
+The system understands meaning, not just keywords.
+
+Example:
+
+* “How to apply?”
+* “Admission process”
+* “Enrollment steps”
+
+All map to similar embeddings.
+
+---
+
+## Models used
+
+### Embedding model
+
+```
+all-MiniLM-L6-v2
+```
+
+### LLM
+
+```
+llama-3.1-8b-instant
+```
+
+### Vector DB
+
+```
+ChromaDB
+```
+
+### PDF parsing
+
+```
+PyMuPDF
+```
+
+---
+
+## How to run locally
+
+### 1. Create environment
 
 ```bash
-cd mpgu_chatbot/backend
-python -m venv .venv
-source .venv/bin/activate         # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-Create `backend/.env`:
-
-```env
-AI_PROVIDER=auto
-GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.5-flash
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-5.2
-HUGGING_FACE_TOKEN=your_huggingface_token
-SECRET_KEY=change-me
-REQUEST_TIMEOUT_SECONDS=15
-```
-
-Run backend:
-
-=======
-# MPGU Smart Assistant (Gemini Demo)
-
-MPGU Smart Assistant is a local demo chatbot for interview/placement showcasing.
-
-## Core intent
-- FastAPI backend
-- Simple HTML/CSS/JS frontend
-- **Gemini-only AI integration**
-- Local knowledge-base fallback when Gemini fails (quota/network/parse)
-
----
-
-## Architecture
-
-- `backend/app/main.py`: FastAPI app + health endpoints + CORS
-- `backend/app/routes/chat.py`: `/api/v1/chat` + history endpoints
-- `backend/app/services/chat_engine.py`: Gemini call flow + intent matching + fallback
-- `backend/data/knowledge_base.json`: domain intent responses
-- `frontend/`: demo UI and metadata badges
-
----
-
-## API behavior (single response format)
-
-`POST /api/v1/chat` always returns:
-
-```json
-{
-  "reply": "...",
-  "message_id": 1234,
-  "user_id": "test_user",
-  "source": "gemini | knowledge_base | knowledge_fallback",
-  "intent": "general_query | course_registration | ...",
-  "confidence": 0.9,
-  "language": "en | ru",
-  "provider_attempted": "gemini | none",
-  "provider_status": "ok | quota_exceeded | request_failed | parse_failed | not_attempted",
-  "fallback_reason": "gemini_429 | gemini_request_exception | domain_intent | ..."
-}
-```
-
-### Runtime flow
-1. Detect language (`en` / `ru`)
-2. Score domain intent against knowledge base
-3. If intent is strongly domain-specific → return knowledge base response directly
-4. Else call Gemini
-5. If Gemini fails (429/network/parse/http) → fallback response with explicit `provider_status` and `fallback_reason`
-
----
-
-## Setup
-
-### 1) Backend
-```bash
-cd mpgu_chatbot/backend
-python -m venv .venv
+cd backend
+python3.11 -m venv .venv
 source .venv/bin/activate
+```
+
+### 2. Install dependencies
+
+```bash
 pip install -r requirements.txt
-cp .env.example .env
 ```
 
-Update `backend/.env`:
+### 3. Configure environment
+
 ```env
-AI_PROVIDER=gemini
-GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-2.5-flash
-REQUEST_TIMEOUT_SECONDS=20
+GROQ_API_KEY=your_key
+GROQ_MODEL=llama-3.1-8b-instant
 ```
 
-Run backend:
->>>>>>> theirs
+### 4. Build knowledge base
+
+```bash
+python ingestion/pdf_loader.py
+python ingestion/crawler.py
+python rag/chunker.py
+python rag/embed_store.py
+```
+
+### 5. Run backend
+
 ```bash
 python run.py
 ```
 
-<<<<<<< ours
-## 2) Frontend
-
-Open second terminal:
-
-=======
-### 2) Frontend
-In another terminal:
->>>>>>> theirs
-```bash
-cd mpgu_chatbot/frontend
-python -m http.server 3000
-```
-
-<<<<<<< ours
-Open `http://localhost:3000`
-
----
-
-## 🏆 Which API is best for placements?
-
-For your interview demo, use this order:
-
-1. **Gemini (`gemini-2.5-flash`)** for speed + quality balance in demos.
-2. **OpenAI (`gpt-5.2`)** as strong secondary option.
-3. **Hugging Face** as additional backup.
-4. **Knowledge fallback** for guaranteed offline reliability.
-
-In this project, set:
-
-```env
-AI_PROVIDER=auto
-```
-
-`auto` tries Gemini first, then OpenAI, then Hugging Face, then fallback.
-
-If you want forced mode:
-
-```env
-AI_PROVIDER=gemini
-# or
-AI_PROVIDER=openai
-# or
-AI_PROVIDER=huggingface
-# or
-AI_PROVIDER=knowledge
-```
-
----
-
-## 🔐 How to get Gemini API key (detailed)
-
-1. Open Google AI Studio: https://aistudio.google.com/  
-2. Create an API key for Gemini and copy it.  
-3. Never paste key in frontend/client files. Keep it in backend `.env` only.  
-4. Ensure your Google Cloud/project billing/quota is configured for your usage.  
-5. Add key in `backend/.env`:
-
-```env
-GEMINI_API_KEY=AIza...
-GEMINI_MODEL=gemini-2.5-flash
-AI_PROVIDER=gemini
-```
-
-6. Restart backend and verify:
-   - `GET /health` should show provider mode.
-   - Responses will show `source: gemini` when Gemini is used.
-
----
-
-## ☁️ Run when project is only on GitHub (no local files)
-
-### Option A (Recommended): GitHub Codespaces
-
-1. Open your GitHub repository page.
-2. Click **Code → Codespaces → Create codespace on branch**.
-3. In terminal:
-   ```bash
-   cd mpgu_chatbot/backend
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
-4. Create `backend/.env` with your API keys.
-5. Start backend:
-   ```bash
-   python run.py
-   ```
-6. In second terminal:
-   ```bash
-   cd mpgu_chatbot/frontend
-   python -m http.server 3000
-   ```
-7. Use forwarded ports in Codespaces (3000 and 5000) and open the UI.
-
-### Option B: Local clone from GitHub
+### 6. Run frontend
 
 ```bash
-git clone <your-github-repo-url>
-cd <repo>/mpgu_chatbot
-```
-
-Then run the same backend/frontend steps from this README.
-
----
-
-## 🧩 If GitHub says “This branch has conflicts that must be resolved”
-
-This usually happens when the base branch changed after your branch was created (both branches edited the same lines in the same files).
-
-For your listed conflict files, run this from the repository root:
-
-```bash
-git checkout <your-branch>
-git merge <base-branch>
-bash mpgu_chatbot/resolve_branch_conflicts.sh
-git commit -m "Resolve merge conflicts"
-git push
-```
-
-If you want to resolve manually, open each conflicted file and remove markers:
-
-- `<<<<<<< HEAD`
-- `=======`
-- `>>>>>>> branch-name`
-
-then:
-
-```bash
-git add mpgu_chatbot/README.md \
-        mpgu_chatbot/backend/app/config.py \
-        mpgu_chatbot/backend/app/main.py \
-        mpgu_chatbot/backend/app/services/chat_engine.py \
-        mpgu_chatbot/backend/run.py
-git commit -m "Resolve merge conflicts manually"
-git push
+python -m http.server 8000
 ```
 
 ---
 
-## ✅ Demo Script (for Interview)
+## API endpoints
 
-1. Ask: “How can I apply for admission?”
-2. Ask: “Контакты МПГУ”
-3. Show metadata badges (`source/intent/language/confidence`).
-4. Disable/remove token and demonstrate graceful fallback still works.
-5. Clear chat history with `Clear` button and show fresh session.
+### GET /
 
----
+Service info
 
-## 🧪 Validation Commands
+### GET /health
 
-```bash
-# from repo root
-python -m compileall mpgu_chatbot/backend/app
+Health check
 
-# optional smoke run (from backend dir)
-PYTHONPATH=. python - <<'PY'
-from app.services.chat_engine import chat_engine
-print(chat_engine.process('How to register for courses?', 'demo_user'))
-PY
-=======
-Open:
-- Frontend: `http://127.0.0.1:3000`
-- Health: `http://127.0.0.1:5000/health`
+### POST /api/v1/chat
+
+Main chat endpoint
+
+### GET /history/{user_id}
+
+Fetch chat history
+
+### DELETE /history/{user_id}
+
+Clear history
 
 ---
 
-## Validation commands
+## Strengths
 
-```bash
-curl http://127.0.0.1:5000/health
-```
-
-```bash
-curl -X POST http://127.0.0.1:5000/api/v1/chat \
--H "Content-Type: application/json" \
--d '{"message":"Explain machine learning in simple terms","user_id":"test_user"}'
-```
-
-```bash
-curl -X POST http://127.0.0.1:5000/api/v1/chat \
--H "Content-Type: application/json" \
--d '{"message":"How do I register for courses?","user_id":"test_user"}'
->>>>>>> theirs
-```
+* Full RAG pipeline
+* Real-world ingestion
+* Semantic search
+* Modular architecture
+* API-first design
+* Bilingual support
 
 ---
 
-<<<<<<< ours
-## ⚠️ Current Constraints
+## Limitations
 
-- History is in-memory (resets on restart)
-- No auth/roles yet
-- No database or dashboard analytics yet
-- Knowledge base is static JSON (not RAG/vector search yet)
-
----
-
-## 📌 Production Upgrade Path
-
-- Add persistent DB (PostgreSQL)
-- Add JWT auth + role-based access
-- Add request logging + metrics
-- Add Redis session/rate limiting
-- Add RAG over official university docs
-- Dockerize + deploy to cloud
+* No persistent DB
+* In-memory chat history
+* Manual vector rebuild
+* Some noisy crawl data
 
 ---
 
-## 🪪 Portfolio Positioning Line
+## Future improvements
 
-> “Built a bilingual hybrid AI assistant with deterministic fallback and metadata-rich responses for reliable university support workflows in interview/demo conditions.”
+* PostgreSQL + Redis integration
+* JWT authentication
+* Hybrid retrieval (BM25 + vector)
+* Re-ranking layer
+* Docker deployment
+* Cloud hosting
+* OCR support
+* Better multilingual tuning
+
+---
+
+## Interview summary
+
+> Built a FastAPI-based bilingual RAG chatbot for MPGU using website/PDF ingestion, embeddings, ChromaDB semantic retrieval, and Groq LLM for grounded responses.
 
 ---
 
 ## License
 
-No license file is currently included. Add one (MIT/Apache-2.0) before public distribution.
-=======
-## Notes for demo
-- If Gemini quota is exhausted (`provider_status=quota_exceeded`), frontend shows fallback warning.
-- Fallback mode is intentional for interview reliability.
-- No external infra (DB/auth/docker) is required for this demo.
->>>>>>> theirs
+MIT or Apache 2.0 recommended.
+
+---
+
+## Final note
+
+This system demonstrates a complete production-style RAG pipeline, from raw data ingestion to LLM-powered contextual answers.
+
+```
+```
