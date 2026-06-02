@@ -1,0 +1,50 @@
+{
+  "intents": [
+    {
+      "id": "greeting",
+      "keywords": ["hello", "hi", "hey", "привет", "здравствуйте", "добрый"],
+      "response_en": "Hello! I’m MPGU Smart Assistant. I can help with admissions, courses, schedules, tutors, exams, and contacts.",
+      "response_ru": "Здравствуйте! Я MPGU Smart Assistant. Я могу помочь с поступлением, курсами, расписанием, преподавателями, экзаменами и контактами."
+    },
+    {
+      "id": "admission",
+      "keywords": ["admission", "apply", "application", "eligibility", "поступ", "прием", "документ"],
+      "response_en": "For admissions: prepare academic documents, language proof (if required), and application form. Confirm deadlines on the official site and admissions office before submission.",
+      "response_ru": "Для поступления подготовьте учебные документы, подтверждение языка (при необходимости) и заявление. Обязательно уточните дедлайны на официальном сайте и в приёмной комиссии."
+    },
+    {
+      "id": "course_registration",
+      "keywords": ["course", "enroll", "register", "subject", "курс", "запис", "дисциплин"],
+      "response_en": "Course registration flow: 1) login to student portal/LMS, 2) open course catalog, 3) check prerequisites, 4) enroll, 5) verify on your dashboard.",
+      "response_ru": "Регистрация на курсы: 1) войдите в личный кабинет/LMS, 2) откройте каталог курсов, 3) проверьте пререквизиты, 4) запишитесь, 5) проверьте курс в личном кабинете."
+    },
+    {
+      "id": "schedule",
+      "keywords": ["schedule", "timetable", "class time", "распис", "пара", "заняти"],
+      "response_en": "Use your student dashboard for the latest timetable. Also cross-check with faculty announcements because schedules can change during semester.",
+      "response_ru": "Актуальное расписание смотрите в личном кабинете студента и в объявлениях факультета, так как в течение семестра возможны изменения."
+    },
+    {
+      "id": "tutor",
+      "keywords": ["tutor", "teacher", "professor", "mentor", "преподав", "учител", "тьютор"],
+      "response_en": "To find tutors/teachers: check faculty pages and LMS directory, filter by subject, then request consultation slots through official channels.",
+      "response_ru": "Чтобы найти преподавателя: проверьте страницы факультета и каталог в LMS, выберите предмет и запросите консультацию через официальные каналы."
+    },
+    {
+      "id": "exam",
+      "keywords": ["exam", "test", "assessment", "егэ", "экзам", "зачет", "аттеста"],
+      "response_en": "For exam preparation, follow syllabus milestones, solve past papers, and attend doubt-clearing sessions with instructors.",
+      "response_ru": "Для подготовки к экзаменам следуйте плану дисциплины, решайте задания прошлых лет и посещайте консультации преподавателей."
+    },
+    {
+      "id": "contacts",
+      "keywords": ["contact", "phone", "email", "address", "контакт", "телефон", "почта", "адрес"],
+      "response_en": "Official MPGU contact details and department-wise numbers should be verified from the official website before you proceed.",
+      "response_ru": "Официальные контакты МПГУ и телефоны подразделений лучше уточнять на официальном сайте перед обращением."
+    }
+  ],
+  "fallback": {
+    "en": "I can help with admissions, courses, schedules, tutors, exams, and contacts. Please ask a specific question and I’ll guide you step by step.",
+    "ru": "Я могу помочь с поступлением, курсами, расписанием, преподавателями, экзаменами и контактами. Задайте более конкретный вопрос, и я отвечу пошагово."
+  }
+}
