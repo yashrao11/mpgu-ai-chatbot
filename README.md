@@ -873,41 +873,6 @@ Possible next improvements:
 
 ---
 
-## Interview positioning
-
-This project is a strong portfolio piece because it shows that you can build a complete AI application stack:
-
-* data ingestion
-* document processing
-* embedding generation
-* vector search
-* LLM orchestration
-* API design
-* frontend integration
-* graceful fallback handling
-
-A good one-line summary for recruiters:
-
-> Built a FastAPI-based bilingual MPGU assistant with website/PDF ingestion, chunking, embeddings, ChromaDB semantic retrieval, and Groq-powered grounded answers.
-
----
-
-## License
-
-Add a license before public distribution.
-
-Recommended options:
-
-* MIT
-* Apache 2.0
-
----
-
-## A note on maintenance
-
-Whenever you update the knowledge sources, remember to regenerate embeddings so the chatbot stays in sync with the latest MPGU content.
-
----
 
 ## Final note
 
