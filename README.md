@@ -876,4 +876,4 @@ Possible next improvements:
 
 ## Final note
 
-This project is no longer a simple chatbot. It is a complete retrieval-based university assistant with a clean architecture that can be extended into a production-grade AI system.
+It is a complete retrieval-based university assistant with a clean architecture that can be extended into a production-grade AI system.
